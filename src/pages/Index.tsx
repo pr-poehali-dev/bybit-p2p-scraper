@@ -49,11 +49,14 @@ const Index = () => {
     prevOffersRef.current = newPriceMap;
   };
 
-  const fetchOffers = async (side: '1' | '0') => {
+  const fetchOffers = async (side: '1' | '0', silent = false) => {
     try {
       const response = await fetch(`${API_URL}?side=${side}`);
       
       if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Превышен лимит запросов. Повторите попытку через минуту.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -76,11 +79,13 @@ const Index = () => {
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Failed to fetch offers:', error);
-      toast({
-        title: 'Ошибка загрузки',
-        description: error instanceof Error ? error.message : 'Не удалось загрузить объявления',
-        variant: 'destructive'
-      });
+      if (!silent) {
+        toast({
+          title: 'Ошибка загрузки',
+          description: error instanceof Error ? error.message : 'Не удалось загрузить объявления',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
@@ -99,8 +104,8 @@ const Index = () => {
   useEffect(() => {
     loadAllOffers();
     const interval = setInterval(() => {
-      fetchOffers('1');
-      fetchOffers('0');
+      fetchOffers('1', true);
+      fetchOffers('0', true);
     }, 15000);
     return () => clearInterval(interval);
   }, []);

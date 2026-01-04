@@ -58,8 +58,8 @@ export const OrderbookTable = ({
                     key={offer.id} 
                     style={{
                       backgroundColor: offer.is_online 
-                        ? (icon === 'TrendingDown' ? '#00FF0033' : '#E9967A33')
-                        : (icon === 'TrendingDown' ? '#00FF0011' : '#E9967A11')
+                        ? (icon === 'TrendingDown' ? '#E9967A33' : '#00FF0033')
+                        : (icon === 'TrendingDown' ? '#E9967A11' : '#00FF0011')
                     }}
                     className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${getPriceChangeClass(offer.id)}`}
                   >

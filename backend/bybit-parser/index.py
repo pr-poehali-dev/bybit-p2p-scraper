@@ -1,5 +1,7 @@
 import json
 import requests
+import random
+import time
 from typing import List, Dict, Any
 
 def handler(event: dict, context) -> dict:
@@ -41,9 +43,19 @@ def handler(event: dict, context) -> dict:
     try:
         url = 'https://api2.bybit.com/fiat/otc/item/online'
         
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+        
         all_offers = []
         page = 1
         max_pages = 10
+        retry_count = 0
+        max_retries = 3
         
         while page <= max_pages:
             payload = {
@@ -61,16 +73,39 @@ def handler(event: dict, context) -> dict:
         
             headers = {
                 'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'User-Agent': random.choice(user_agents),
                 'Accept': 'application/json',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Origin': 'https://www.bybit.com',
-                'Referer': 'https://www.bybit.com/'
+                'Referer': 'https://www.bybit.com/fiat/trade/otc/',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
             }
             
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
-            
-            if response.status_code != 200:
-                break
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=15)
+                
+                if response.status_code == 429:
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        wait_time = random.uniform(2, 5)
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        break
+                
+                if response.status_code != 200:
+                    break
+                    
+                retry_count = 0
+                
+            except requests.exceptions.RequestException:
+                if retry_count < max_retries:
+                    retry_count += 1
+                    time.sleep(random.uniform(1, 3))
+                    continue
+                else:
+                    break
             
             response_data = response.json()
             
@@ -130,29 +165,33 @@ def handler(event: dict, context) -> dict:
                 is_online = bool(item.get('isOnline', False))
                 last_logout_time = item.get('lastLogoutTime', '')
                 
-                # Определяем тип мерчанта
-                # Мерчанты определяются по высокому количеству сделок и authStatus
-                auth_status = item.get('authStatus', 0)
-                recent_orders = int(item.get('recentOrderNum', 0))
-                recent_rate = int(item.get('recentExecuteRate', 0))
+                # Определяем тип мерчанта по badge который приходит от API
+                auth_maker = item.get('authMaker', False)
+                auth_tags = item.get('authTag', [])
+                if not isinstance(auth_tags, list):
+                    auth_tags = []
                 
                 merchant_type = None
                 merchant_badge = None
+                is_merchant = False
                 
-                # Только пользователи с большим количеством сделок и высоким рейтингом - мерчанты
-                if auth_status == 2 and recent_orders >= 1000 and recent_rate >= 95:
-                    # Определяем уровень мерчанта по количеству сделок
-                    if recent_orders >= 3000:
-                        merchant_type = 'gold'
-                        merchant_badge = 'vaGoldIcon'
-                    elif recent_orders >= 2000:
-                        merchant_type = 'silver'
-                        merchant_badge = 'vaSilverIcon'
-                    elif recent_orders >= 1000:
-                        merchant_type = 'bronze'
-                        merchant_badge = 'vaBronzeIcon'
-                
-                is_merchant = merchant_type is not None
+                # Проверяем наличие значков мерчанта в authTag
+                if 'GA' in auth_tags:
+                    merchant_type = 'gold'
+                    merchant_badge = 'vaGoldIcon'
+                    is_merchant = True
+                elif 'SA' in auth_tags:
+                    merchant_type = 'silver'
+                    merchant_badge = 'vaSilverIcon'
+                    is_merchant = True
+                elif 'BA' in auth_tags:
+                    merchant_type = 'bronze'
+                    merchant_badge = 'vaBronzeIcon'
+                    is_merchant = True
+                elif 'BT' in auth_tags:
+                    merchant_type = 'block_trade'
+                    merchant_badge = 'baIcon'
+                    is_merchant = True
                 
                 offer = {
                     'id': str(item.get('id', '')),
@@ -172,13 +211,14 @@ def handler(event: dict, context) -> dict:
                     'is_online': is_online,
                     'is_triangle': is_triangle,
                     'last_logout_time': last_logout_time,
-                    'auth_status': auth_status
+                    'auth_tags': auth_tags
                 }
                 all_offers.append(offer)
             
             if len(items) < 100:
                 break
             
+            time.sleep(random.uniform(0.3, 0.8))
             page += 1
         
         return {
