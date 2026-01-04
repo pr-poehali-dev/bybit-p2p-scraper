@@ -78,6 +78,12 @@ def handler(event: dict, context) -> dict:
             'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0'
         ]
         
+        proxies_list = [
+            {'http': 'http://Vxh6Kjy8:Kfv2bLct@157.22.11.191:63616', 'https': 'http://Vxh6Kjy8:Kfv2bLct@157.22.11.191:63616'},
+            {'http': 'http://Vxh6Kjy8:Kfv2bLct@153.80.66.167:64486', 'https': 'http://Vxh6Kjy8:Kfv2bLct@153.80.66.167:64486'},
+            {'http': 'http://Vxh6Kjy8:Kfv2bLct@45.144.37.156:62948', 'https': 'http://Vxh6Kjy8:Kfv2bLct@45.144.37.156:62948'}
+        ]
+        
         all_offers = []
         page = 1
         max_pages = 10
@@ -128,7 +134,8 @@ def handler(event: dict, context) -> dict:
             }
             
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=15)
+                proxy = random.choice(proxies_list) if random.random() > 0.3 else None
+                response = requests.post(url, json=payload, headers=headers, proxies=proxy, timeout=15)
                 
                 if response.status_code == 429:
                     if retry_count < max_retries:
