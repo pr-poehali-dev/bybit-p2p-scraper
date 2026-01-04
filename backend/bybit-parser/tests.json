@@ -7,7 +7,8 @@
       "expectedStatus": 200,
       "expectedBody": {
         "total": "number",
-        "side": "sell"
+        "side": "sell",
+        "offers": "array"
       },
       "bodyMatcher": "partial"
     }

@@ -56,7 +56,12 @@ export const OrderbookTable = ({
                 {offers.map((offer, idx) => (
                   <tr 
                     key={offer.id} 
-                    className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${offer.is_online ? `${bgClass}/50` : `${bgClass}/20`} ${getPriceChangeClass(offer.id)}`}
+                    style={{
+                      backgroundColor: offer.is_online 
+                        ? (icon === 'TrendingDown' ? '#00FF0033' : '#E9967A33')
+                        : (icon === 'TrendingDown' ? '#00FF0011' : '#E9967A11')
+                    }}
+                    className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${getPriceChangeClass(offer.id)}`}
                   >
                     <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
                     <td className={`py-0 px-1 font-bold ${textClass}`}>
@@ -72,14 +77,14 @@ export const OrderbookTable = ({
                     </td>
                     <td className="py-0 px-1">
                       <div className="flex items-center gap-0.5">
-                        {offer.merchant_type === 'gold' ? (
-                          <span className="text-[10px] flex-shrink-0 w-[14px]" title="Золотой мерчант">🥇</span>
-                        ) : offer.merchant_type === 'silver' ? (
-                          <span className="text-[10px] flex-shrink-0 w-[14px]" title="Серебряный мерчант">🥈</span>
-                        ) : offer.merchant_type === 'bronze' ? (
-                          <span className="text-[10px] flex-shrink-0 w-[14px]" title="Бронзовый мерчант">🥉</span>
-                        ) : offer.merchant_type === 'block_trade' ? (
-                          <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0 w-[14px]" title="Мерчант блочной торговли" />
+                        {offer.is_merchant && offer.merchant_type === 'gold' ? (
+                          <img src="https://www.bybit.com/p2p/static/media/vaGoldIcon.b23a7c43c4096b78ef71.png" alt="Золотой мерчант" className="w-[14px] h-[14px] flex-shrink-0" title="Золотой мерчант" />
+                        ) : offer.is_merchant && offer.merchant_type === 'silver' ? (
+                          <img src="https://www.bybit.com/p2p/static/media/vaSilverIcon.8a83d2497a7eccc3612a.png" alt="Серебряный мерчант" className="w-[14px] h-[14px] flex-shrink-0" title="Серебряный мерчант" />
+                        ) : offer.is_merchant && offer.merchant_type === 'bronze' ? (
+                          <img src="https://www.bybit.com/p2p/static/media/vaBronzeIcon.c5efb09734d07fde15b7.png" alt="Бронзовый мерчант" className="w-[14px] h-[14px] flex-shrink-0" title="Бронзовый мерчант" />
+                        ) : offer.is_merchant && offer.merchant_type === 'block_trade' ? (
+                          <img src="https://www.bybit.com/p2p/static/media/baIcon.69355c7c5637b10dbbc525e40a629961.svg" alt="Мерчант блочной торговли" className="w-[14px] h-[14px] flex-shrink-0" title="Мерчант блочной торговли" />
                         ) : (
                           <span className="w-[14px] flex-shrink-0"></span>
                         )}

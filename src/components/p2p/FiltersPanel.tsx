@@ -48,7 +48,7 @@ export const FiltersPanel = ({
             <Input 
               id="amountLimit" 
               type="number" 
-              placeholder="10000"
+              placeholder="0"
               value={amountLimit}
               onChange={(e) => setAmountLimit(e.target.value)}
               className="h-6 text-[10px] px-2"
