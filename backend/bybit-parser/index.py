@@ -134,8 +134,13 @@ def handler(event: dict, context) -> dict:
             }
             
             try:
+                # Пробуем с прокси, при ошибке - без прокси
                 proxy = random.choice(proxies_list) if random.random() > 0.3 else None
-                response = requests.post(url, json=payload, headers=headers, proxies=proxy, timeout=15)
+                try:
+                    response = requests.post(url, json=payload, headers=headers, proxies=proxy, timeout=15)
+                except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError):
+                    # Если прокси не работает - делаем запрос напрямую
+                    response = requests.post(url, json=payload, headers=headers, timeout=15)
                 
                 if response.status_code == 429:
                     if retry_count < max_retries:
