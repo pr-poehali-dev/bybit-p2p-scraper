@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
@@ -20,14 +20,48 @@ interface P2POffer {
   total_orders: number;
 }
 
+interface PriceChange {
+  [key: string]: 'up' | 'down' | 'new' | null;
+}
+
 const API_URL = 'https://functions.poehali.dev/ea8079f5-9a7d-41e0-9530-698a124a62b8';
 
 const Index = () => {
   const [sellOffers, setSellOffers] = useState<P2POffer[]>([]);
   const [buyOffers, setBuyOffers] = useState<P2POffer[]>([]);
+  const [priceChanges, setPriceChanges] = useState<PriceChange>({});
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<'sell' | 'buy'>('sell');
+  const prevOffersRef = useRef<Map<string, number>>(new Map());
+
+  const detectPriceChanges = (newOffers: P2POffer[], prevOffers: Map<string, number>) => {
+    const changes: PriceChange = {};
+    
+    newOffers.forEach(offer => {
+      const prevPrice = prevOffers.get(offer.id);
+      
+      if (prevPrice === undefined) {
+        changes[offer.id] = 'new';
+      } else if (offer.price > prevPrice) {
+        changes[offer.id] = 'up';
+      } else if (offer.price < prevPrice) {
+        changes[offer.id] = 'down';
+      }
+    });
+
+    setPriceChanges(changes);
+    
+    setTimeout(() => {
+      setPriceChanges({});
+    }, 2000);
+
+    const newPriceMap = new Map<string, number>();
+    newOffers.forEach(offer => {
+      newPriceMap.set(offer.id, offer.price);
+    });
+    prevOffersRef.current = newPriceMap;
+  };
 
   const fetchOffers = async (side: '1' | '0') => {
     try {
@@ -44,10 +78,14 @@ const Index = () => {
         throw new Error(data.error);
       }
       
+      const newOffers = data.offers || [];
+      
       if (side === '1') {
-        setSellOffers(data.offers || []);
+        detectPriceChanges(newOffers, prevOffersRef.current);
+        setSellOffers(newOffers);
       } else {
-        setBuyOffers(data.offers || []);
+        detectPriceChanges(newOffers, prevOffersRef.current);
+        setBuyOffers(newOffers);
       }
       
       setLastUpdate(new Date());
@@ -72,7 +110,7 @@ const Index = () => {
 
   useEffect(() => {
     loadAllOffers();
-    const interval = setInterval(loadAllOffers, 60000);
+    const interval = setInterval(loadAllOffers, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -80,6 +118,14 @@ const Index = () => {
   const avgPrice = currentOffers.length > 0
     ? currentOffers.reduce((sum, o) => sum + o.price, 0) / currentOffers.length
     : 0;
+
+  const getPriceChangeClass = (offerId: string) => {
+    const change = priceChanges[offerId];
+    if (change === 'up') return 'animate-pulse-glow bg-success/20';
+    if (change === 'down') return 'animate-pulse-glow bg-destructive/20';
+    if (change === 'new') return 'animate-fade-in bg-primary/20';
+    return '';
+  };
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -90,13 +136,13 @@ const Index = () => {
               <Icon name="TrendingUp" size={36} className="text-primary" />
               Bybit P2P — USDT/RUB
             </h1>
-            <p className="text-muted-foreground mt-1">Все объявления с реальными данными</p>
+            <p className="text-muted-foreground mt-1">Все объявления с автообновлением каждые 15 секунд</p>
           </div>
           <div className="flex items-center gap-4">
             {lastUpdate && (
               <div className="text-right">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Icon name="Clock" size={16} />
+                  <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
                   {lastUpdate.toLocaleTimeString('ru-RU')}
                 </div>
               </div>
@@ -149,6 +195,10 @@ const Index = () => {
             <CardTitle className="flex items-center gap-2">
               <Icon name="BookOpen" size={20} />
               Все объявления
+              <Badge variant="outline" className="ml-auto">
+                <Icon name="Zap" size={12} className="mr-1" />
+                Live
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -186,12 +236,23 @@ const Index = () => {
                         {currentOffers.map((offer) => (
                           <tr 
                             key={offer.id} 
-                            className={`border-b border-border hover:bg-secondary/50 transition-colors ${
+                            className={`border-b border-border hover:bg-secondary/50 transition-all duration-300 ${
                               offer.side === 'sell' ? 'bg-sell' : 'bg-buy'
-                            }`}
+                            } ${getPriceChangeClass(offer.id)}`}
                           >
-                            <td className={`py-3 px-4 font-bold text-xl ${offer.side === 'sell' ? 'text-sell' : 'text-buy'}`}>
-                              {offer.price.toFixed(2)} ₽
+                            <td className={`py-3 px-4 font-bold text-xl transition-all duration-300 ${offer.side === 'sell' ? 'text-sell' : 'text-buy'}`}>
+                              <div className="flex items-center gap-2">
+                                {offer.price.toFixed(2)} ₽
+                                {priceChanges[offer.id] === 'up' && (
+                                  <Icon name="TrendingUp" size={16} className="text-success animate-fade-in" />
+                                )}
+                                {priceChanges[offer.id] === 'down' && (
+                                  <Icon name="TrendingDown" size={16} className="text-destructive animate-fade-in" />
+                                )}
+                                {priceChanges[offer.id] === 'new' && (
+                                  <Badge variant="outline" className="text-xs animate-fade-in">NEW</Badge>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex flex-col">
@@ -200,10 +261,10 @@ const Index = () => {
                               </div>
                             </td>
                             <td className="py-3 px-4 text-foreground font-medium">
-                              {offer.quantity.toLocaleString()} USDT
+                              {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USDT
                             </td>
                             <td className="py-3 px-4 text-muted-foreground text-sm">
-                              {offer.min_amount.toLocaleString()} - {offer.max_amount.toLocaleString()} ₽
+                              {offer.min_amount.toLocaleString('ru-RU')} - {offer.max_amount.toLocaleString('ru-RU')} ₽
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex flex-wrap gap-1">
