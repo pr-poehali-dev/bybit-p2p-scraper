@@ -36,6 +36,7 @@ def handler(event: dict, context) -> dict:
     
     params = event.get('queryStringParameters') or {}
     side = str(params.get('side', '1')) if params.get('side') else '1'
+    debug = params.get('debug') == 'true'
     
     try:
         url = 'https://api2.bybit.com/fiat/otc/item/online'
@@ -84,6 +85,30 @@ def handler(event: dict, context) -> dict:
             if not isinstance(items, list) or len(items) == 0:
                 break
             
+            if debug and page == 1 and len(items) > 0:
+                first_item = items[0]
+                debug_info = {
+                    'debug': True,
+                    'raw_item_keys': list(first_item.keys()),
+                    'raw_item': first_item,
+                    'authMaker': first_item.get('authMaker'),
+                    'userType': first_item.get('userType'),
+                    'online': first_item.get('online'),
+                    'lastOnlineTime': first_item.get('lastOnlineTime'),
+                    'currentTime': first_item.get('currentTime'),
+                    'recentOrderNum': first_item.get('recentOrderNum'),
+                    'recentExecuteRate': first_item.get('recentExecuteRate')
+                }
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps(debug_info, ensure_ascii=False, indent=2),
+                    'isBase64Encoded': False
+                }
+            
             for item in items:
                 if not isinstance(item, dict):
                     continue
@@ -101,23 +126,35 @@ def handler(event: dict, context) -> dict:
                 max_amt = float(item.get('maxAmount', 0))
                 is_triangle = abs(max_amt - min_amt) <= 1.0
                 
-                # Определяем тип мерчанта
-                auth_maker = bool(item.get('authMaker', False))
-                merchant_type = None
-                if auth_maker:
-                    user_type = item.get('userType', 0)
-                    if user_type == 2:
-                        merchant_type = 'block_trade'
-                    else:
-                        merchant_type = 'verified'
+                # Онлайн статус - используем isOnline
+                is_online = bool(item.get('isOnline', False))
+                last_logout_time = item.get('lastLogoutTime', '')
                 
-                # Онлайн статус - проверяем lastOnlineTime
-                last_online = item.get('lastOnlineTime', 0)
-                current_time = item.get('currentTime', 0)
-                if current_time and last_online:
-                    is_online = (current_time - last_online) < 60000
-                else:
-                    is_online = bool(item.get('online', False))
+                # Определяем тип мерчанта через authStatus и authTag
+                auth_status = item.get('authStatus', 0)
+                auth_tag = item.get('authTag', [])
+                if not isinstance(auth_tag, list):
+                    auth_tag = []
+                
+                merchant_type = None
+                merchant_badge = None
+                
+                if auth_status > 0 and len(auth_tag) > 0:
+                    tag = auth_tag[0] if len(auth_tag) > 0 else ''
+                    if tag == 'GA':
+                        merchant_type = 'gold'
+                        merchant_badge = 'vaGoldIcon'
+                    elif tag == 'SA':
+                        merchant_type = 'silver'
+                        merchant_badge = 'vaSilverIcon'
+                    elif tag == 'BA':
+                        merchant_type = 'bronze'
+                        merchant_badge = 'vaBronzeIcon'
+                    elif tag == 'BT':
+                        merchant_type = 'block_trade'
+                        merchant_badge = 'baIcon'
+                
+                is_merchant = merchant_type is not None
                 
                 offer = {
                     'id': str(item.get('id', '')),
@@ -129,13 +166,15 @@ def handler(event: dict, context) -> dict:
                     'max_amount': max_amt,
                     'payment_methods': payment_methods,
                     'side': 'sell' if side == '1' else 'buy',
-                    'completion_rate': float(item.get('recentOrderNum', 0)),
+                    'completion_rate': int(item.get('recentOrderNum', 0)),
                     'total_orders': int(item.get('recentExecuteRate', 0)),
-                    'is_merchant': auth_maker,
+                    'is_merchant': is_merchant,
                     'merchant_type': merchant_type,
+                    'merchant_badge': merchant_badge,
                     'is_online': is_online,
                     'is_triangle': is_triangle,
-                    'last_online_time': last_online
+                    'last_logout_time': last_logout_time,
+                    'auth_status': auth_status
                 }
                 all_offers.append(offer)
             

@@ -22,10 +22,12 @@ interface P2POffer {
   completion_rate: number;
   total_orders: number;
   is_merchant: boolean;
-  merchant_type: 'verified' | 'block_trade' | null;
+  merchant_type: 'gold' | 'silver' | 'bronze' | 'block_trade' | null;
+  merchant_badge: string | null;
   is_online: boolean;
   is_triangle: boolean;
-  last_online_time?: number;
+  last_logout_time?: string;
+  auth_status?: number;
 }
 
 interface PriceChange {
@@ -213,7 +215,9 @@ const Index = () => {
     : 0;
 
   const merchantCount = currentOffers.filter(o => o.is_merchant).length;
-  const verifiedCount = currentOffers.filter(o => o.merchant_type === 'verified').length;
+  const goldCount = currentOffers.filter(o => o.merchant_type === 'gold').length;
+  const silverCount = currentOffers.filter(o => o.merchant_type === 'silver').length;
+  const bronzeCount = currentOffers.filter(o => o.merchant_type === 'bronze').length;
   const blockTradeCount = currentOffers.filter(o => o.merchant_type === 'block_trade').length;
   const onlineCount = currentOffers.filter(o => o.is_online).length;
   const triangleCount = currentOffers.filter(o => o.is_triangle).length;
@@ -253,7 +257,7 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 md:grid-cols-7 gap-1.5">
+        <div className="grid grid-cols-3 md:grid-cols-9 gap-1.5">
           <Card className="border-border bg-card">
             <CardContent className="p-2">
               <div className="text-[10px] text-muted-foreground mb-0.5">Средняя</div>
@@ -280,9 +284,27 @@ const Index = () => {
           <Card className="border-border bg-card">
             <CardContent className="p-2">
               <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
-                <Icon name="ShieldCheck" size={10} /> Пров.
+                <span className="text-yellow-500">🥇</span> Золото
               </div>
-              <div className="text-base font-bold text-green-500">{verifiedCount}</div>
+              <div className="text-base font-bold text-yellow-500">{goldCount}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardContent className="p-2">
+              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
+                <span className="text-gray-400">🥈</span> Серебро
+              </div>
+              <div className="text-base font-bold text-gray-400">{silverCount}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardContent className="p-2">
+              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
+                <span className="text-orange-600">🥉</span> Бронза
+              </div>
+              <div className="text-base font-bold text-orange-600">{bronzeCount}</div>
             </CardContent>
           </Card>
 
@@ -408,8 +430,8 @@ const Index = () => {
                           key={offer.id} 
                           className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 bg-sell ${getPriceChangeClass(offer.id)}`}
                         >
-                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
-                          <td className="py-0.5 px-1 font-bold text-sell">
+                          <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
+                          <td className="py-0 px-1 font-bold text-sell">
                             <div className="flex items-center gap-0.5">
                               {offer.price.toFixed(2)}
                               {priceChanges[offer.id] === 'up' && (
@@ -420,10 +442,20 @@ const Index = () => {
                               )}
                             </div>
                           </td>
-                          <td className="py-0.5 px-1">
+                          <td className="py-0 px-1">
                             <div className="flex items-center gap-0.5">
-                              {offer.is_online && (
-                                <div className="w-1 h-1 rounded-full bg-success flex-shrink-0" />
+                              <div className={`w-1 h-1 rounded-full flex-shrink-0 ${offer.is_online ? 'bg-[#20b26c]' : 'bg-[#d5dae0]'}`} />
+                              {offer.merchant_type === 'gold' && (
+                                <span className="text-[10px] flex-shrink-0" title="Золотой мерчант">🥇</span>
+                              )}
+                              {offer.merchant_type === 'silver' && (
+                                <span className="text-[10px] flex-shrink-0" title="Серебряный мерчант">🥈</span>
+                              )}
+                              {offer.merchant_type === 'bronze' && (
+                                <span className="text-[10px] flex-shrink-0" title="Бронзовый мерчант">🥉</span>
+                              )}
+                              {offer.merchant_type === 'block_trade' && (
+                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
                               )}
                               <span 
                                 className="font-semibold text-foreground truncate max-w-[80px]"
@@ -431,24 +463,18 @@ const Index = () => {
                               >
                                 {offer.maker}
                               </span>
-                              {offer.merchant_type === 'verified' && (
-                                <Icon name="ShieldCheck" size={9} className="text-green-500 flex-shrink-0" title="Проверенный мерчант" />
-                              )}
-                              {offer.merchant_type === 'block_trade' && (
-                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
-                              )}
                               {offer.is_triangle && (
                                 <span className="text-yellow-500 text-[8px] flex-shrink-0" title="Треугольник">△</span>
                               )}
                             </div>
                           </td>
-                          <td className="py-0.5 px-1 text-foreground font-medium">
+                          <td className="py-0 px-1 text-foreground font-medium">
                             {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                           </td>
-                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">
+                          <td className="py-0 px-1 text-muted-foreground text-[9px]">
                             {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                           </td>
-                          <td className="py-0.5 px-1">
+                          <td className="py-0 px-1">
                             <div className="flex items-center gap-0.5">
                               {offer.payment_methods.length > 0 ? (
                                 offer.payment_methods.slice(0, 3).map((method, mIdx) => (
@@ -461,7 +487,7 @@ const Index = () => {
                               )}
                             </div>
                           </td>
-                          <td className="py-0.5 px-1">
+                          <td className="py-0 px-1">
                             <div className="flex flex-col leading-none">
                               <span className="text-foreground font-medium text-[9px]">{offer.completion_rate.toFixed(0)}</span>
                               <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
@@ -539,8 +565,8 @@ const Index = () => {
                           key={offer.id} 
                           className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 bg-buy ${getPriceChangeClass(offer.id)}`}
                         >
-                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
-                          <td className="py-0.5 px-1 font-bold text-buy">
+                          <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
+                          <td className="py-0 px-1 font-bold text-buy">
                             <div className="flex items-center gap-0.5">
                               {offer.price.toFixed(2)}
                               {priceChanges[offer.id] === 'up' && (
@@ -551,10 +577,20 @@ const Index = () => {
                               )}
                             </div>
                           </td>
-                          <td className="py-0.5 px-1">
+                          <td className="py-0 px-1">
                             <div className="flex items-center gap-0.5">
-                              {offer.is_online && (
-                                <div className="w-1 h-1 rounded-full bg-success flex-shrink-0" />
+                              <div className={`w-1 h-1 rounded-full flex-shrink-0 ${offer.is_online ? 'bg-[#20b26c]' : 'bg-[#d5dae0]'}`} />
+                              {offer.merchant_type === 'gold' && (
+                                <span className="text-[10px] flex-shrink-0" title="Золотой мерчант">🥇</span>
+                              )}
+                              {offer.merchant_type === 'silver' && (
+                                <span className="text-[10px] flex-shrink-0" title="Серебряный мерчант">🥈</span>
+                              )}
+                              {offer.merchant_type === 'bronze' && (
+                                <span className="text-[10px] flex-shrink-0" title="Бронзовый мерчант">🥉</span>
+                              )}
+                              {offer.merchant_type === 'block_trade' && (
+                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
                               )}
                               <span 
                                 className="font-semibold text-foreground truncate max-w-[80px]"
@@ -562,24 +598,18 @@ const Index = () => {
                               >
                                 {offer.maker}
                               </span>
-                              {offer.merchant_type === 'verified' && (
-                                <Icon name="ShieldCheck" size={9} className="text-green-500 flex-shrink-0" title="Проверенный мерчант" />
-                              )}
-                              {offer.merchant_type === 'block_trade' && (
-                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
-                              )}
                               {offer.is_triangle && (
                                 <span className="text-yellow-500 text-[8px] flex-shrink-0" title="Треугольник">△</span>
                               )}
                             </div>
                           </td>
-                          <td className="py-0.5 px-1 text-foreground font-medium">
+                          <td className="py-0 px-1 text-foreground font-medium">
                             {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                           </td>
-                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">
+                          <td className="py-0 px-1 text-muted-foreground text-[9px]">
                             {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                           </td>
-                          <td className="py-0.5 px-1">
+                          <td className="py-0 px-1">
                             <div className="flex items-center gap-0.5">
                               {offer.payment_methods.length > 0 ? (
                                 offer.payment_methods.slice(0, 3).map((method, mIdx) => (
@@ -592,7 +622,7 @@ const Index = () => {
                               )}
                             </div>
                           </td>
-                          <td className="py-0.5 px-1">
+                          <td className="py-0 px-1">
                             <div className="flex flex-col leading-none">
                               <span className="text-foreground font-medium text-[9px]">{offer.completion_rate.toFixed(0)}</span>
                               <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
