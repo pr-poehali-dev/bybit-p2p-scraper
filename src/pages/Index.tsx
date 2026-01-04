@@ -1,73 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-
-interface P2POffer {
-  id: string;
-  price: number;
-  maker: string;
-  maker_id: string;
-  quantity: number;
-  min_amount: number;
-  max_amount: number;
-  payment_methods: string[];
-  side: 'buy' | 'sell';
-  completion_rate: number;
-  total_orders: number;
-  is_merchant: boolean;
-  merchant_type: 'gold' | 'silver' | 'bronze' | 'block_trade' | null;
-  merchant_badge: string | null;
-  is_online: boolean;
-  is_triangle: boolean;
-  last_logout_time?: string;
-  auth_status?: number;
-}
-
-interface PriceChange {
-  [key: string]: 'up' | 'down' | null;
-}
-
-const PaymentIcon = ({ method }: { method: string }) => {
-  const lower = method.toLowerCase();
-  
-  if (lower.includes('cash') || lower === 'наличные') {
-    return <Icon name="Banknote" size={12} className="text-green-500" />;
-  }
-  if (lower.includes('mobile') || lower.includes('top-up')) {
-    return <Icon name="Smartphone" size={12} className="text-blue-500" />;
-  }
-  if (lower.includes('bank') || lower.includes('transfer')) {
-    return <Icon name="Building2" size={12} className="text-purple-500" />;
-  }
-  if (lower.includes('deposit')) {
-    return <Icon name="Landmark" size={12} className="text-orange-500" />;
-  }
-  
-  if (lower.includes('sber') || lower.includes('сбер')) {
-    return <span className="text-[10px] font-bold text-green-600">СБ</span>;
-  }
-  if (lower.includes('tinkoff') || lower.includes('тинькофф')) {
-    return <span className="text-[10px] font-bold text-yellow-500">ТИ</span>;
-  }
-  if (lower.includes('alfa') || lower.includes('альфа')) {
-    return <span className="text-[10px] font-bold text-red-500">АЛ</span>;
-  }
-  if (lower.includes('raif') || lower.includes('райф')) {
-    return <span className="text-[10px] font-bold text-yellow-600">РФ</span>;
-  }
-  if (lower.includes('vtb') || lower.includes('втб')) {
-    return <span className="text-[10px] font-bold text-blue-600">ВТБ</span>;
-  }
-  
-  return <Icon name="CreditCard" size={12} className="text-gray-500" />;
-};
+import { P2POffer, PriceChange } from '@/components/p2p/types';
+import { StatisticsCards } from '@/components/p2p/StatisticsCards';
+import { FiltersPanel } from '@/components/p2p/FiltersPanel';
+import { OrderbookTable } from '@/components/p2p/OrderbookTable';
 
 const API_URL = 'https://functions.poehali.dev/ea8079f5-9a7d-41e0-9530-698a124a62b8';
 
@@ -80,7 +18,6 @@ const Index = () => {
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
-  // Filters
   const [onlyMerchants, setOnlyMerchants] = useState(false);
   const [onlyOnline, setOnlyOnline] = useState(false);
   const [noTriangle, setNoTriangle] = useState(false);
@@ -177,7 +114,6 @@ const Index = () => {
       if (amountLimit) {
         const amount = parseFloat(amountLimit);
         if (!isNaN(amount)) {
-          // Показываем только тех, к кому можно зайти с этой суммой
           if (amount < offer.min_amount || amount > offer.max_amount) return false;
         }
       }
@@ -195,7 +131,6 @@ const Index = () => {
       if (amountLimit) {
         const amount = parseFloat(amountLimit);
         if (!isNaN(amount)) {
-          // Показываем только тех, к кому можно зайти с этой суммой
           if (amount < offer.min_amount || amount > offer.max_amount) return false;
         }
       }
@@ -252,328 +187,51 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 md:grid-cols-9 gap-1.5">
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5">Средняя</div>
-              <div className="text-base font-bold text-foreground">{avgPrice.toFixed(2)} ₽</div>
-            </CardContent>
-          </Card>
+        <StatisticsCards
+          avgPrice={avgPrice}
+          totalOffers={currentOffers.length}
+          merchantCount={merchantCount}
+          goldCount={goldCount}
+          silverCount={silverCount}
+          bronzeCount={bronzeCount}
+          blockTradeCount={blockTradeCount}
+          onlineCount={onlineCount}
+          triangleCount={triangleCount}
+        />
 
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5">Всего</div>
-              <div className="text-base font-bold text-foreground">{currentOffers.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
-                <Icon name="BadgeCheck" size={10} /> Мерч.
-              </div>
-              <div className="text-base font-bold text-primary">{merchantCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
-                <span className="text-yellow-500">🥇</span> Золото
-              </div>
-              <div className="text-base font-bold text-yellow-500">{goldCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
-                <span className="text-gray-400">🥈</span> Серебро
-              </div>
-              <div className="text-base font-bold text-gray-400">{silverCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
-                <span className="text-orange-600">🥉</span> Бронза
-              </div>
-              <div className="text-base font-bold text-orange-600">{bronzeCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
-                <Icon name="Blocks" size={10} /> Блок
-              </div>
-              <div className="text-base font-bold text-blue-500">{blockTradeCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-0.5">
-                <Icon name="Wifi" size={10} /> Онлайн
-              </div>
-              <div className="text-base font-bold text-success">{onlineCount}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="text-[10px] text-muted-foreground mb-0.5">Треугол</div>
-              <div className="text-base font-bold text-yellow-500">{triangleCount}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="border-border bg-card">
-          <CardContent className="p-2">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div className="flex items-center space-x-1.5">
-                <Switch id="merchants" checked={onlyMerchants} onCheckedChange={setOnlyMerchants} className="scale-75" />
-                <Label htmlFor="merchants" className="text-[10px] cursor-pointer">Только мерчанты</Label>
-              </div>
-              
-              <div className="flex items-center space-x-1.5">
-                <Switch id="online" checked={onlyOnline} onCheckedChange={setOnlyOnline} className="scale-75" />
-                <Label htmlFor="online" className="text-[10px] cursor-pointer">Только онлайн</Label>
-              </div>
-              
-              <div className="flex items-center space-x-1.5">
-                <Switch id="notriangle" checked={noTriangle} onCheckedChange={setNoTriangle} className="scale-75" />
-                <Label htmlFor="notriangle" className="text-[10px] cursor-pointer">Без треугол</Label>
-              </div>
-
-              <div className="space-y-0.5">
-                <Label htmlFor="amountLimit" className="text-[10px]">Сумма сделки</Label>
-                <Input 
-                  id="amountLimit" 
-                  type="number" 
-                  placeholder="10000"
-                  value={amountLimit}
-                  onChange={(e) => setAmountLimit(e.target.value)}
-                  className="h-6 text-[10px] px-2"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <FiltersPanel
+          onlyMerchants={onlyMerchants}
+          setOnlyMerchants={setOnlyMerchants}
+          onlyOnline={onlyOnline}
+          setOnlyOnline={setOnlyOnline}
+          noTriangle={noTriangle}
+          setNoTriangle={setNoTriangle}
+          amountLimit={amountLimit}
+          setAmountLimit={setAmountLimit}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="flex items-center gap-2 mb-2">
-                <Icon name="TrendingDown" size={14} className="text-sell" />
-                <span className="text-xs font-semibold">Продажа ({filteredSellOffers.length})</span>
-              </div>
-              {isLoading && sellOffers.length === 0 ? (
-                <div className="flex items-center justify-center py-6">
-                  <Icon name="Loader2" size={24} className="animate-spin text-primary" />
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[10px]">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground w-6">#</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Цена</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Трейдер</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">USDT</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Лимиты</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Опл</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Сд</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredSellOffers.map((offer, idx) => (
-                        <tr 
-                          key={offer.id} 
-                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${offer.is_online ? 'bg-sell/50' : 'bg-sell/20'} ${getPriceChangeClass(offer.id)}`}
-                        >
-                          <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
-                          <td className="py-0 px-1 font-bold text-sell">
-                            <div className="flex items-center gap-0.5">
-                              {offer.price.toFixed(2)}
-                              {priceChanges[offer.id] === 'up' && (
-                                <Icon name="ArrowUp" size={9} className="text-success" />
-                              )}
-                              {priceChanges[offer.id] === 'down' && (
-                                <Icon name="ArrowDown" size={9} className="text-destructive" />
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-0 px-1">
-                            <div className="flex items-center gap-0.5">
-                              {offer.merchant_type === 'gold' ? (
-                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Золотой мерчант">🥇</span>
-                              ) : offer.merchant_type === 'silver' ? (
-                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Серебряный мерчант">🥈</span>
-                              ) : offer.merchant_type === 'bronze' ? (
-                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Бронзовый мерчант">🥉</span>
-                              ) : offer.merchant_type === 'block_trade' ? (
-                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0 w-[14px]" title="Мерчант блочной торговли" />
-                              ) : (
-                                <span className="w-[14px] flex-shrink-0"></span>
-                              )}
-                              <span 
-                                className="font-semibold text-foreground truncate max-w-[80px]"
-                                title={`ID: ${offer.maker_id}`}
-                              >
-                                {offer.maker}
-                              </span>
-                              {offer.is_triangle && (
-                                <span className="text-yellow-500 text-[8px] flex-shrink-0" title="Треугольник">△</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-0 px-1 text-foreground font-medium">
-                            {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                          </td>
-                          <td className="py-0 px-1 text-muted-foreground text-[9px]">
-                            {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                          </td>
-                          <td className="py-0 px-1">
-                            <div className="flex items-center gap-0.5">
-                              {offer.payment_methods.length > 0 ? (
-                                offer.payment_methods.slice(0, 3).map((method, mIdx) => (
-                                  <div key={mIdx} title={method}>
-                                    <PaymentIcon method={method} />
-                                  </div>
-                                ))
-                              ) : (
-                                <span className="text-[9px] text-muted-foreground">—</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-0 px-1">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-foreground font-medium text-[9px]">{offer.completion_rate.toFixed(0)}</span>
-                              <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {filteredSellOffers.length === 0 && !isLoading && (
-                    <div className="text-center py-4">
-                      <Icon name="SearchX" size={24} className="mx-auto text-muted-foreground mb-1" />
-                      <p className="text-[10px] text-muted-foreground">Нет объявлений</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <OrderbookTable
+            title="Продажа"
+            icon="TrendingDown"
+            iconClass="text-sell"
+            offers={filteredSellOffers}
+            priceChanges={priceChanges}
+            getPriceChangeClass={getPriceChangeClass}
+            isLoading={isLoading}
+            allOffersEmpty={sellOffers.length === 0}
+          />
 
-          <Card className="border-border bg-card">
-            <CardContent className="p-2">
-              <div className="flex items-center gap-2 mb-2">
-                <Icon name="TrendingUp" size={14} className="text-buy" />
-                <span className="text-xs font-semibold">Покупка ({filteredBuyOffers.length})</span>
-              </div>
-              {isLoading && buyOffers.length === 0 ? (
-                <div className="flex items-center justify-center py-6">
-                  <Icon name="Loader2" size={24} className="animate-spin text-primary" />
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[10px]">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground w-6">#</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Цена</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Трейдер</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">USDT</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Лимиты</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Опл</th>
-                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Сд</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredBuyOffers.map((offer, idx) => (
-                        <tr 
-                          key={offer.id} 
-                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${offer.is_online ? 'bg-buy/50' : 'bg-buy/20'} ${getPriceChangeClass(offer.id)}`}
-                        >
-                          <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
-                          <td className="py-0 px-1 font-bold text-buy">
-                            <div className="flex items-center gap-0.5">
-                              {offer.price.toFixed(2)}
-                              {priceChanges[offer.id] === 'up' && (
-                                <Icon name="ArrowUp" size={9} className="text-success" />
-                              )}
-                              {priceChanges[offer.id] === 'down' && (
-                                <Icon name="ArrowDown" size={9} className="text-destructive" />
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-0 px-1">
-                            <div className="flex items-center gap-0.5">
-                              {offer.merchant_type === 'gold' ? (
-                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Золотой мерчант">🥇</span>
-                              ) : offer.merchant_type === 'silver' ? (
-                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Серебряный мерчант">🥈</span>
-                              ) : offer.merchant_type === 'bronze' ? (
-                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Бронзовый мерчант">🥉</span>
-                              ) : offer.merchant_type === 'block_trade' ? (
-                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0 w-[14px]" title="Мерчант блочной торговли" />
-                              ) : (
-                                <span className="w-[14px] flex-shrink-0"></span>
-                              )}
-                              <span 
-                                className="font-semibold text-foreground truncate max-w-[80px]"
-                                title={`ID: ${offer.maker_id}`}
-                              >
-                                {offer.maker}
-                              </span>
-                              {offer.is_triangle && (
-                                <span className="text-yellow-500 text-[8px] flex-shrink-0" title="Треугольник">△</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-0 px-1 text-foreground font-medium">
-                            {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                          </td>
-                          <td className="py-0 px-1 text-muted-foreground text-[9px]">
-                            {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                          </td>
-                          <td className="py-0 px-1">
-                            <div className="flex items-center gap-0.5">
-                              {offer.payment_methods.length > 0 ? (
-                                offer.payment_methods.slice(0, 3).map((method, mIdx) => (
-                                  <div key={mIdx} title={method}>
-                                    <PaymentIcon method={method} />
-                                  </div>
-                                ))
-                              ) : (
-                                <span className="text-[9px] text-muted-foreground">—</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-0 px-1">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-foreground font-medium text-[9px]">{offer.completion_rate.toFixed(0)}</span>
-                              <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {filteredBuyOffers.length === 0 && !isLoading && (
-                    <div className="text-center py-4">
-                      <Icon name="SearchX" size={24} className="mx-auto text-muted-foreground mb-1" />
-                      <p className="text-[10px] text-muted-foreground">Нет объявлений</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <OrderbookTable
+            title="Покупка"
+            icon="TrendingUp"
+            iconClass="text-buy"
+            offers={filteredBuyOffers}
+            priceChanges={priceChanges}
+            getPriceChangeClass={getPriceChangeClass}
+            isLoading={isLoading}
+            allOffersEmpty={buyOffers.length === 0}
+          />
         </div>
       </div>
     </div>
