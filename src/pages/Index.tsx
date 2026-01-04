@@ -620,8 +620,6 @@ const Index = () => {
             </CardContent>
           </Card>
         </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
