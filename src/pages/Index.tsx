@@ -51,11 +51,24 @@ const Index = () => {
 
   const fetchOffers = async (side: '1' | '0', silent = false) => {
     try {
-      const response = await fetch(`${API_URL}?side=${side}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      const response = await fetch(`${API_URL}?side=${side}`, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         if (response.status === 429) {
           throw new Error('Превышен лимит запросов. Повторите попытку через минуту.');
+        }
+        if (response.status === 504 || response.status === 502) {
+          throw new Error('Сервер недоступен. Попробуйте позже.');
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -80,9 +93,17 @@ const Index = () => {
     } catch (error) {
       console.error('Failed to fetch offers:', error);
       if (!silent) {
+        let errorMessage = 'Не удалось загрузить объявления';
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            errorMessage = 'Превышено время ожидания. API Bybit может быть перегружен.';
+          } else {
+            errorMessage = error.message;
+          }
+        }
         toast({
           title: 'Ошибка загрузки',
-          description: error instanceof Error ? error.message : 'Не удалось загрузить объявления',
+          description: errorMessage,
           variant: 'destructive'
         });
       }

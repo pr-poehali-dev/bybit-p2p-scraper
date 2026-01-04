@@ -3,6 +3,10 @@ import requests
 import random
 import time
 from typing import List, Dict, Any
+from datetime import datetime, timedelta
+
+cache = {}
+CACHE_TTL = 10
 
 def handler(event: dict, context) -> dict:
     '''
@@ -39,6 +43,23 @@ def handler(event: dict, context) -> dict:
     params = event.get('queryStringParameters') or {}
     side = str(params.get('side', '1')) if params.get('side') else '1'
     debug = params.get('debug') == 'true'
+    
+    cache_key = f'offers_{side}'
+    now = datetime.now()
+    
+    if cache_key in cache:
+        cached_data, cached_time = cache[cache_key]
+        if now - cached_time < timedelta(seconds=CACHE_TTL):
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'X-Cache': 'HIT'
+                },
+                'body': json.dumps(cached_data),
+                'isBase64Encoded': False
+            }
     
     try:
         url = 'https://api2.bybit.com/fiat/otc/item/online'
@@ -221,18 +242,23 @@ def handler(event: dict, context) -> dict:
             time.sleep(random.uniform(0.3, 0.8))
             page += 1
         
+        result_data = {
+            'offers': all_offers,
+            'total': len(all_offers),
+            'side': 'sell' if side == '1' else 'buy',
+            'pages_loaded': page - 1
+        }
+        
+        cache[cache_key] = (result_data, datetime.now())
+        
         return {
             'statusCode': 200,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': '*',
+                'X-Cache': 'MISS'
             },
-            'body': json.dumps({
-                'offers': all_offers,
-                'total': len(all_offers),
-                'side': 'sell' if side == '1' else 'buy',
-                'pages_loaded': page - 1
-            }),
+            'body': json.dumps(result_data),
             'isBase64Encoded': False
         }
         
