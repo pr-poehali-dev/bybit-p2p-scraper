@@ -18,6 +18,7 @@ interface P2POffer {
   side: 'buy' | 'sell';
   completion_rate: number;
   total_orders: number;
+  is_merchant: boolean;
 }
 
 interface PriceChange {
@@ -34,20 +35,24 @@ const Index = () => {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<'sell' | 'buy'>('sell');
   const prevOffersRef = useRef<Map<string, number>>(new Map());
+  const seenOfferIdsRef = useRef<Set<string>>(new Set());
 
   const detectPriceChanges = (newOffers: P2POffer[], prevOffers: Map<string, number>) => {
     const changes: PriceChange = {};
     
     newOffers.forEach(offer => {
       const prevPrice = prevOffers.get(offer.id);
+      const wasSeen = seenOfferIdsRef.current.has(offer.id);
       
-      if (prevPrice === undefined) {
+      if (prevPrice === undefined && wasSeen) {
         changes[offer.id] = 'new';
-      } else if (offer.price > prevPrice) {
+      } else if (prevPrice !== undefined && offer.price > prevPrice) {
         changes[offer.id] = 'up';
-      } else if (offer.price < prevPrice) {
+      } else if (prevPrice !== undefined && offer.price < prevPrice) {
         changes[offer.id] = 'down';
       }
+      
+      seenOfferIdsRef.current.add(offer.id);
     });
 
     setPriceChanges(changes);
@@ -255,9 +260,19 @@ const Index = () => {
                               </div>
                             </td>
                             <td className="py-3 px-4">
-                              <div className="flex flex-col">
-                                <span className="font-semibold text-foreground">{offer.maker}</span>
-                                <span className="text-xs text-muted-foreground">ID: {offer.maker_id}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-foreground">{offer.maker}</span>
+                                    {offer.is_merchant && (
+                                      <Badge variant="secondary" className="text-xs bg-primary/20 text-primary border-primary/30">
+                                        <Icon name="BadgeCheck" size={12} className="mr-1" />
+                                        Merchant
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">ID: {offer.maker_id}</span>
+                                </div>
                               </div>
                             </td>
                             <td className="py-3 px-4 text-foreground font-medium">

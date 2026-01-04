@@ -108,7 +108,8 @@ def handler(event: dict, context) -> dict:
                     'payment_methods': payment_methods,
                     'side': 'sell' if side == '1' else 'buy',
                     'completion_rate': float(item.get('recentOrderNum', 0)),
-                    'total_orders': int(item.get('recentExecuteRate', 0))
+                    'total_orders': int(item.get('recentExecuteRate', 0)),
+                    'is_merchant': bool(item.get('authMaker', False))
                 }
                 all_offers.append(offer)
             
