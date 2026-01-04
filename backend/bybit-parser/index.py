@@ -142,18 +142,28 @@ def handler(event: dict, context) -> dict:
                 break
             
             if debug and page == 1 and len(items) > 0:
-                first_item = items[0]
+                debug_items = []
+                for item in items[:10]:
+                    debug_items.append({
+                        'nickName': item.get('nickName'),
+                        'authMaker': item.get('authMaker'),
+                        'authStatus': item.get('authStatus'),
+                        'authTag': item.get('authTag'),
+                        'userType': item.get('userType'),
+                        'isMerchant': item.get('isMerchant'),
+                        'merchantLevel': item.get('merchantLevel'),
+                        'certificationLevel': item.get('certificationLevel'),
+                        'vaGoldIcon': item.get('vaGoldIcon'),
+                        'vaSilverIcon': item.get('vaSilverIcon'),
+                        'vaBronzeIcon': item.get('vaBronzeIcon'),
+                        'baIcon': item.get('baIcon'),
+                        'recentOrderNum': item.get('recentOrderNum'),
+                        'recentExecuteRate': item.get('recentExecuteRate'),
+                        'all_keys': list(item.keys())
+                    })
                 debug_info = {
                     'debug': True,
-                    'raw_item_keys': list(first_item.keys()),
-                    'raw_item': first_item,
-                    'authMaker': first_item.get('authMaker'),
-                    'userType': first_item.get('userType'),
-                    'online': first_item.get('online'),
-                    'lastOnlineTime': first_item.get('lastOnlineTime'),
-                    'currentTime': first_item.get('currentTime'),
-                    'recentOrderNum': first_item.get('recentOrderNum'),
-                    'recentExecuteRate': first_item.get('recentExecuteRate')
+                    'items': debug_items
                 }
                 return {
                     'statusCode': 200,
@@ -186,8 +196,8 @@ def handler(event: dict, context) -> dict:
                 is_online = bool(item.get('isOnline', False))
                 last_logout_time = item.get('lastLogoutTime', '')
                 
-                # Определяем тип мерчанта по badge который приходит от API
-                auth_maker = item.get('authMaker', False)
+                # Определяем тип мерчанта по Verified Advertiser тегам
+                # VA = Verified Advertiser (мерчант Bybit)
                 auth_tags = item.get('authTag', [])
                 if not isinstance(auth_tags, list):
                     auth_tags = []
@@ -196,22 +206,19 @@ def handler(event: dict, context) -> dict:
                 merchant_badge = None
                 is_merchant = False
                 
-                # Проверяем наличие значков мерчанта в authTag
-                if 'GA' in auth_tags:
+                # Проверяем наличие VA (Verified Advertiser) тегов
+                # VA3 = Gold, VA2 = Silver, VA1/VA = Bronze
+                if 'VA3' in auth_tags:
                     merchant_type = 'gold'
                     merchant_badge = 'vaGoldIcon'
                     is_merchant = True
-                elif 'SA' in auth_tags:
+                elif 'VA2' in auth_tags:
                     merchant_type = 'silver'
                     merchant_badge = 'vaSilverIcon'
                     is_merchant = True
-                elif 'BA' in auth_tags:
+                elif 'VA1' in auth_tags or 'VA' in auth_tags:
                     merchant_type = 'bronze'
                     merchant_badge = 'vaBronzeIcon'
-                    is_merchant = True
-                elif 'BT' in auth_tags:
-                    merchant_type = 'block_trade'
-                    merchant_badge = 'baIcon'
                     is_merchant = True
                 
                 offer = {
