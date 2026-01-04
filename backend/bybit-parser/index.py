@@ -130,29 +130,27 @@ def handler(event: dict, context) -> dict:
                 is_online = bool(item.get('isOnline', False))
                 last_logout_time = item.get('lastLogoutTime', '')
                 
-                # Определяем тип мерчанта через authStatus и authTag
+                # Определяем тип мерчанта
+                # Мерчанты определяются по высокому количеству сделок и authStatus
                 auth_status = item.get('authStatus', 0)
-                auth_tag = item.get('authTag', [])
-                if not isinstance(auth_tag, list):
-                    auth_tag = []
+                recent_orders = int(item.get('recentOrderNum', 0))
+                recent_rate = int(item.get('recentExecuteRate', 0))
                 
                 merchant_type = None
                 merchant_badge = None
                 
-                if auth_status > 0 and len(auth_tag) > 0:
-                    tag = auth_tag[0] if len(auth_tag) > 0 else ''
-                    if tag == 'GA':
+                # Только пользователи с большим количеством сделок и высоким рейтингом - мерчанты
+                if auth_status == 2 and recent_orders >= 1000 and recent_rate >= 95:
+                    # Определяем уровень мерчанта по количеству сделок
+                    if recent_orders >= 3000:
                         merchant_type = 'gold'
                         merchant_badge = 'vaGoldIcon'
-                    elif tag == 'SA':
+                    elif recent_orders >= 2000:
                         merchant_type = 'silver'
                         merchant_badge = 'vaSilverIcon'
-                    elif tag == 'BA':
+                    elif recent_orders >= 1000:
                         merchant_type = 'bronze'
                         merchant_badge = 'vaBronzeIcon'
-                    elif tag == 'BT':
-                        merchant_type = 'block_trade'
-                        merchant_badge = 'baIcon'
                 
                 is_merchant = merchant_type is not None
                 

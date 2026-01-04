@@ -84,8 +84,7 @@ const Index = () => {
   const [onlyMerchants, setOnlyMerchants] = useState(false);
   const [onlyOnline, setOnlyOnline] = useState(false);
   const [noTriangle, setNoTriangle] = useState(false);
-  const [minLimit, setMinLimit] = useState<string>('');
-  const [maxLimit, setMaxLimit] = useState<string>('');
+  const [amountLimit, setAmountLimit] = useState<string>('');
 
   const detectPriceChanges = (newOffers: P2POffer[], prevOffers: Map<string, number>) => {
     const changes: PriceChange = {};
@@ -175,19 +174,17 @@ const Index = () => {
       if (onlyOnline && !offer.is_online) return false;
       if (noTriangle && offer.is_triangle) return false;
       
-      if (minLimit) {
-        const min = parseFloat(minLimit);
-        if (!isNaN(min) && offer.min_amount < min) return false;
-      }
-      
-      if (maxLimit) {
-        const max = parseFloat(maxLimit);
-        if (!isNaN(max) && offer.max_amount > max) return false;
+      if (amountLimit) {
+        const amount = parseFloat(amountLimit);
+        if (!isNaN(amount)) {
+          // Показываем только тех, к кому можно зайти с этой суммой
+          if (amount < offer.min_amount || amount > offer.max_amount) return false;
+        }
       }
       
       return true;
     });
-  }, [sellOffers, onlyMerchants, onlyOnline, noTriangle, minLimit, maxLimit]);
+  }, [sellOffers, onlyMerchants, onlyOnline, noTriangle, amountLimit]);
 
   const filteredBuyOffers = useMemo(() => {
     return buyOffers.filter(offer => {
@@ -195,19 +192,17 @@ const Index = () => {
       if (onlyOnline && !offer.is_online) return false;
       if (noTriangle && offer.is_triangle) return false;
       
-      if (minLimit) {
-        const min = parseFloat(minLimit);
-        if (!isNaN(min) && offer.min_amount < min) return false;
-      }
-      
-      if (maxLimit) {
-        const max = parseFloat(maxLimit);
-        if (!isNaN(max) && offer.max_amount > max) return false;
+      if (amountLimit) {
+        const amount = parseFloat(amountLimit);
+        if (!isNaN(amount)) {
+          // Показываем только тех, к кому можно зайти с этой суммой
+          if (amount < offer.min_amount || amount > offer.max_amount) return false;
+        }
       }
       
       return true;
     });
-  }, [buyOffers, onlyMerchants, onlyOnline, noTriangle, minLimit, maxLimit]);
+  }, [buyOffers, onlyMerchants, onlyOnline, noTriangle, amountLimit]);
 
   const currentOffers = [...filteredSellOffers, ...filteredBuyOffers];
   const avgPrice = currentOffers.length > 0
@@ -336,7 +331,7 @@ const Index = () => {
 
         <Card className="border-border bg-card">
           <CardContent className="p-2">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div className="flex items-center space-x-1.5">
                 <Switch id="merchants" checked={onlyMerchants} onCheckedChange={setOnlyMerchants} className="scale-75" />
                 <Label htmlFor="merchants" className="text-[10px] cursor-pointer">Только мерчанты</Label>
@@ -353,25 +348,13 @@ const Index = () => {
               </div>
 
               <div className="space-y-0.5">
-                <Label htmlFor="minLimit" className="text-[10px]">Мин. лимит</Label>
+                <Label htmlFor="amountLimit" className="text-[10px]">Сумма сделки</Label>
                 <Input 
-                  id="minLimit" 
+                  id="amountLimit" 
                   type="number" 
-                  placeholder="0"
-                  value={minLimit}
-                  onChange={(e) => setMinLimit(e.target.value)}
-                  className="h-6 text-[10px] px-2"
-                />
-              </div>
-
-              <div className="space-y-0.5">
-                <Label htmlFor="maxLimit" className="text-[10px]">Макс. лимит</Label>
-                <Input 
-                  id="maxLimit" 
-                  type="number" 
-                  placeholder="∞"
-                  value={maxLimit}
-                  onChange={(e) => setMaxLimit(e.target.value)}
+                  placeholder="10000"
+                  value={amountLimit}
+                  onChange={(e) => setAmountLimit(e.target.value)}
                   className="h-6 text-[10px] px-2"
                 />
               </div>
@@ -384,14 +367,7 @@ const Index = () => {
             <CardContent className="p-2">
               <div className="flex items-center gap-2 mb-2">
                 <Icon name="TrendingDown" size={14} className="text-sell" />
-                <span className="text-xs font-semibold">Продажа ({sellOffers.filter(o => {
-                  if (onlyMerchants && !o.is_merchant) return false;
-                  if (onlyOnline && !o.is_online) return false;
-                  if (noTriangle && o.is_triangle) return false;
-                  if (minLimit && o.min_amount < parseFloat(minLimit)) return false;
-                  if (maxLimit && o.max_amount > parseFloat(maxLimit)) return false;
-                  return true;
-                }).length})</span>
+                <span className="text-xs font-semibold">Продажа ({filteredSellOffers.length})</span>
               </div>
               {isLoading && sellOffers.length === 0 ? (
                 <div className="flex items-center justify-center py-6">
@@ -412,23 +388,10 @@ const Index = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {sellOffers.filter(offer => {
-                        if (onlyMerchants && !offer.is_merchant) return false;
-                        if (onlyOnline && !offer.is_online) return false;
-                        if (noTriangle && offer.is_triangle) return false;
-                        if (minLimit) {
-                          const min = parseFloat(minLimit);
-                          if (!isNaN(min) && offer.min_amount < min) return false;
-                        }
-                        if (maxLimit) {
-                          const max = parseFloat(maxLimit);
-                          if (!isNaN(max) && offer.max_amount > max) return false;
-                        }
-                        return true;
-                      }).map((offer, idx) => (
+                      {filteredSellOffers.map((offer, idx) => (
                         <tr 
                           key={offer.id} 
-                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 bg-sell ${getPriceChangeClass(offer.id)}`}
+                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${offer.is_online ? 'bg-sell/50' : 'bg-sell/20'} ${getPriceChangeClass(offer.id)}`}
                         >
                           <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
                           <td className="py-0 px-1 font-bold text-sell">
@@ -444,18 +407,16 @@ const Index = () => {
                           </td>
                           <td className="py-0 px-1">
                             <div className="flex items-center gap-0.5">
-                              <div className={`w-1 h-1 rounded-full flex-shrink-0 ${offer.is_online ? 'bg-[#20b26c]' : 'bg-[#d5dae0]'}`} />
-                              {offer.merchant_type === 'gold' && (
-                                <span className="text-[10px] flex-shrink-0" title="Золотой мерчант">🥇</span>
-                              )}
-                              {offer.merchant_type === 'silver' && (
-                                <span className="text-[10px] flex-shrink-0" title="Серебряный мерчант">🥈</span>
-                              )}
-                              {offer.merchant_type === 'bronze' && (
-                                <span className="text-[10px] flex-shrink-0" title="Бронзовый мерчант">🥉</span>
-                              )}
-                              {offer.merchant_type === 'block_trade' && (
-                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
+                              {offer.merchant_type === 'gold' ? (
+                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Золотой мерчант">🥇</span>
+                              ) : offer.merchant_type === 'silver' ? (
+                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Серебряный мерчант">🥈</span>
+                              ) : offer.merchant_type === 'bronze' ? (
+                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Бронзовый мерчант">🥉</span>
+                              ) : offer.merchant_type === 'block_trade' ? (
+                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0 w-[14px]" title="Мерчант блочной торговли" />
+                              ) : (
+                                <span className="w-[14px] flex-shrink-0"></span>
                               )}
                               <span 
                                 className="font-semibold text-foreground truncate max-w-[80px]"
@@ -497,14 +458,7 @@ const Index = () => {
                       ))}
                     </tbody>
                   </table>
-                  {sellOffers.filter(offer => {
-                    if (onlyMerchants && !offer.is_merchant) return false;
-                    if (onlyOnline && !offer.is_online) return false;
-                    if (noTriangle && offer.is_triangle) return false;
-                    if (minLimit && offer.min_amount < parseFloat(minLimit)) return false;
-                    if (maxLimit && offer.max_amount > parseFloat(maxLimit)) return false;
-                    return true;
-                  }).length === 0 && !isLoading && (
+                  {filteredSellOffers.length === 0 && !isLoading && (
                     <div className="text-center py-4">
                       <Icon name="SearchX" size={24} className="mx-auto text-muted-foreground mb-1" />
                       <p className="text-[10px] text-muted-foreground">Нет объявлений</p>
@@ -519,14 +473,7 @@ const Index = () => {
             <CardContent className="p-2">
               <div className="flex items-center gap-2 mb-2">
                 <Icon name="TrendingUp" size={14} className="text-buy" />
-                <span className="text-xs font-semibold">Покупка ({buyOffers.filter(o => {
-                  if (onlyMerchants && !o.is_merchant) return false;
-                  if (onlyOnline && !o.is_online) return false;
-                  if (noTriangle && o.is_triangle) return false;
-                  if (minLimit && o.min_amount < parseFloat(minLimit)) return false;
-                  if (maxLimit && o.max_amount > parseFloat(maxLimit)) return false;
-                  return true;
-                }).length})</span>
+                <span className="text-xs font-semibold">Покупка ({filteredBuyOffers.length})</span>
               </div>
               {isLoading && buyOffers.length === 0 ? (
                 <div className="flex items-center justify-center py-6">
@@ -547,23 +494,10 @@ const Index = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {buyOffers.filter(offer => {
-                        if (onlyMerchants && !offer.is_merchant) return false;
-                        if (onlyOnline && !offer.is_online) return false;
-                        if (noTriangle && offer.is_triangle) return false;
-                        if (minLimit) {
-                          const min = parseFloat(minLimit);
-                          if (!isNaN(min) && offer.min_amount < min) return false;
-                        }
-                        if (maxLimit) {
-                          const max = parseFloat(maxLimit);
-                          if (!isNaN(max) && offer.max_amount > max) return false;
-                        }
-                        return true;
-                      }).map((offer, idx) => (
+                      {filteredBuyOffers.map((offer, idx) => (
                         <tr 
                           key={offer.id} 
-                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 bg-buy ${getPriceChangeClass(offer.id)}`}
+                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${offer.is_online ? 'bg-buy/50' : 'bg-buy/20'} ${getPriceChangeClass(offer.id)}`}
                         >
                           <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
                           <td className="py-0 px-1 font-bold text-buy">
@@ -579,18 +513,16 @@ const Index = () => {
                           </td>
                           <td className="py-0 px-1">
                             <div className="flex items-center gap-0.5">
-                              <div className={`w-1 h-1 rounded-full flex-shrink-0 ${offer.is_online ? 'bg-[#20b26c]' : 'bg-[#d5dae0]'}`} />
-                              {offer.merchant_type === 'gold' && (
-                                <span className="text-[10px] flex-shrink-0" title="Золотой мерчант">🥇</span>
-                              )}
-                              {offer.merchant_type === 'silver' && (
-                                <span className="text-[10px] flex-shrink-0" title="Серебряный мерчант">🥈</span>
-                              )}
-                              {offer.merchant_type === 'bronze' && (
-                                <span className="text-[10px] flex-shrink-0" title="Бронзовый мерчант">🥉</span>
-                              )}
-                              {offer.merchant_type === 'block_trade' && (
-                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
+                              {offer.merchant_type === 'gold' ? (
+                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Золотой мерчант">🥇</span>
+                              ) : offer.merchant_type === 'silver' ? (
+                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Серебряный мерчант">🥈</span>
+                              ) : offer.merchant_type === 'bronze' ? (
+                                <span className="text-[10px] flex-shrink-0 w-[14px]" title="Бронзовый мерчант">🥉</span>
+                              ) : offer.merchant_type === 'block_trade' ? (
+                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0 w-[14px]" title="Мерчант блочной торговли" />
+                              ) : (
+                                <span className="w-[14px] flex-shrink-0"></span>
                               )}
                               <span 
                                 className="font-semibold text-foreground truncate max-w-[80px]"
@@ -632,14 +564,7 @@ const Index = () => {
                       ))}
                     </tbody>
                   </table>
-                  {buyOffers.filter(offer => {
-                    if (onlyMerchants && !offer.is_merchant) return false;
-                    if (onlyOnline && !offer.is_online) return false;
-                    if (noTriangle && offer.is_triangle) return false;
-                    if (minLimit && offer.min_amount < parseFloat(minLimit)) return false;
-                    if (maxLimit && offer.max_amount > parseFloat(maxLimit)) return false;
-                    return true;
-                  }).length === 0 && !isLoading && (
+                  {filteredBuyOffers.length === 0 && !isLoading && (
                     <div className="text-center py-4">
                       <Icon name="SearchX" size={24} className="mx-auto text-muted-foreground mb-1" />
                       <p className="text-[10px] text-muted-foreground">Нет объявлений</p>
