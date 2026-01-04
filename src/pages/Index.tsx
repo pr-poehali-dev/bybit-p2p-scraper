@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface P2POffer {
   id: string;
@@ -19,6 +22,8 @@ interface P2POffer {
   completion_rate: number;
   total_orders: number;
   is_merchant: boolean;
+  is_online: boolean;
+  is_triangle: boolean;
 }
 
 interface PriceChange {
@@ -36,6 +41,13 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<'sell' | 'buy'>('sell');
   const prevOffersRef = useRef<Map<string, number>>(new Map());
   const seenOfferIdsRef = useRef<Set<string>>(new Set());
+
+  // Filters
+  const [onlyMerchants, setOnlyMerchants] = useState(false);
+  const [onlyOnline, setOnlyOnline] = useState(false);
+  const [onlyTriangle, setOnlyTriangle] = useState(false);
+  const [minLimit, setMinLimit] = useState<string>('');
+  const [maxLimit, setMaxLimit] = useState<string>('');
 
   const detectPriceChanges = (newOffers: P2POffer[], prevOffers: Map<string, number>) => {
     const changes: PriceChange = {};
@@ -119,10 +131,36 @@ const Index = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const currentOffers = activeTab === 'sell' ? sellOffers : buyOffers;
+  const filteredOffers = useMemo(() => {
+    const offers = activeTab === 'sell' ? sellOffers : buyOffers;
+    
+    return offers.filter(offer => {
+      if (onlyMerchants && !offer.is_merchant) return false;
+      if (onlyOnline && !offer.is_online) return false;
+      if (onlyTriangle && !offer.is_triangle) return false;
+      
+      if (minLimit) {
+        const min = parseFloat(minLimit);
+        if (!isNaN(min) && offer.min_amount < min) return false;
+      }
+      
+      if (maxLimit) {
+        const max = parseFloat(maxLimit);
+        if (!isNaN(max) && offer.max_amount > max) return false;
+      }
+      
+      return true;
+    });
+  }, [sellOffers, buyOffers, activeTab, onlyMerchants, onlyOnline, onlyTriangle, minLimit, maxLimit]);
+
+  const currentOffers = filteredOffers;
   const avgPrice = currentOffers.length > 0
     ? currentOffers.reduce((sum, o) => sum + o.price, 0) / currentOffers.length
     : 0;
+
+  const merchantCount = currentOffers.filter(o => o.is_merchant).length;
+  const onlineCount = currentOffers.filter(o => o.is_online).length;
+  const triangleCount = currentOffers.filter(o => o.is_triangle).length;
 
   const getPriceChangeClass = (offerId: string) => {
     const change = priceChanges[offerId];
@@ -133,108 +171,185 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="min-h-screen bg-background p-2 md:p-4">
+      <div className="max-w-[1800px] mx-auto space-y-3 animate-fade-in">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground flex items-center gap-3">
-              <Icon name="TrendingUp" size={36} className="text-primary" />
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+              <Icon name="TrendingUp" size={28} className="text-primary" />
               Bybit P2P — USDT/RUB
             </h1>
-            <p className="text-muted-foreground mt-1">Все объявления с автообновлением каждые 15 секунд</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {lastUpdate && (
-              <div className="text-right">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
-                  {lastUpdate.toLocaleTimeString('ru-RU')}
-                </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className={`w-2 h-2 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
+                {lastUpdate.toLocaleTimeString('ru-RU')}
               </div>
             )}
             <Button 
               onClick={loadAllOffers}
               disabled={isLoading}
               variant="outline"
+              size="sm"
             >
-              <Icon name="RefreshCw" size={16} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              <Icon name="RefreshCw" size={14} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               Обновить
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Средняя цена</CardTitle>
+            <CardHeader className="pb-2 pt-3 px-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Средняя цена</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{avgPrice.toFixed(2)} ₽</div>
-              <p className="text-xs text-muted-foreground mt-1">за 1 USDT</p>
+            <CardContent className="pb-3 px-3">
+              <div className="text-xl font-bold text-foreground">{avgPrice.toFixed(2)} ₽</div>
             </CardContent>
           </Card>
 
           <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Объявлений продажи</CardTitle>
+            <CardHeader className="pb-2 pt-3 px-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Всего</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-sell">{sellOffers.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">активных предложений</p>
+            <CardContent className="pb-3 px-3">
+              <div className="text-xl font-bold text-foreground">{currentOffers.length}</div>
             </CardContent>
           </Card>
 
           <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Объявлений покупки</CardTitle>
+            <CardHeader className="pb-2 pt-3 px-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Мерчанты</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-buy">{buyOffers.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">активных предложений</p>
+            <CardContent className="pb-3 px-3">
+              <div className="text-xl font-bold text-primary">{merchantCount}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2 pt-3 px-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Онлайн</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-3 px-3">
+              <div className="text-xl font-bold text-success">{onlineCount}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2 pt-3 px-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Треугол</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-3 px-3">
+              <div className="text-xl font-bold text-foreground">{triangleCount}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2 pt-3 px-3">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Продажа/Покупка</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-3 px-3">
+              <div className="text-xl font-bold">
+                <span className="text-sell">{sellOffers.length}</span>
+                <span className="text-muted-foreground mx-1">/</span>
+                <span className="text-buy">{buyOffers.length}</span>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icon name="BookOpen" size={20} />
+          <CardHeader className="pb-3 pt-3 px-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Icon name="Filter" size={16} />
+              Фильтры
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="flex items-center space-x-2">
+                <Switch id="merchants" checked={onlyMerchants} onCheckedChange={setOnlyMerchants} />
+                <Label htmlFor="merchants" className="text-xs cursor-pointer">Только мерчанты</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Switch id="online" checked={onlyOnline} onCheckedChange={setOnlyOnline} />
+                <Label htmlFor="online" className="text-xs cursor-pointer">Только онлайн</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Switch id="triangle" checked={onlyTriangle} onCheckedChange={setOnlyTriangle} />
+                <Label htmlFor="triangle" className="text-xs cursor-pointer">Только треугол</Label>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="minLimit" className="text-xs">Мин. лимит (₽)</Label>
+                <Input 
+                  id="minLimit" 
+                  type="number" 
+                  placeholder="0"
+                  value={minLimit}
+                  onChange={(e) => setMinLimit(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="maxLimit" className="text-xs">Макс. лимит (₽)</Label>
+                <Input 
+                  id="maxLimit" 
+                  type="number" 
+                  placeholder="∞"
+                  value={maxLimit}
+                  onChange={(e) => setMaxLimit(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3 pt-3 px-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Icon name="BookOpen" size={16} />
               Все объявления
-              <Badge variant="outline" className="ml-auto">
-                <Icon name="Zap" size={12} className="mr-1" />
+              <Badge variant="outline" className="ml-auto text-xs">
+                <Icon name="Zap" size={10} className="mr-1" />
                 Live
               </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pb-3">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'sell' | 'buy')}>
-              <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-                <TabsTrigger value="sell" className="data-[state=active]:bg-destructive/20">
-                  <Icon name="TrendingDown" size={16} className="mr-2 text-sell" />
+              <TabsList className="grid w-full max-w-md grid-cols-2 mb-3 h-8">
+                <TabsTrigger value="sell" className="data-[state=active]:bg-destructive/20 text-xs">
+                  <Icon name="TrendingDown" size={14} className="mr-1 text-sell" />
                   Продажа ({sellOffers.length})
                 </TabsTrigger>
-                <TabsTrigger value="buy" className="data-[state=active]:bg-success/20">
-                  <Icon name="TrendingUp" size={16} className="mr-2 text-buy" />
+                <TabsTrigger value="buy" className="data-[state=active]:bg-success/20 text-xs">
+                  <Icon name="TrendingUp" size={14} className="mr-1 text-buy" />
                   Покупка ({buyOffers.length})
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value={activeTab}>
+              <TabsContent value={activeTab} className="mt-0">
                 {isLoading && currentOffers.length === 0 ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Icon name="Loader2" size={32} className="animate-spin text-primary" />
+                  <div className="flex items-center justify-center py-8">
+                    <Icon name="Loader2" size={28} className="animate-spin text-primary" />
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Цена</th>
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Трейдер</th>
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Количество USDT</th>
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Лимиты (₽)</th>
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Способы оплаты</th>
-                          <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Сделок</th>
+                          <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Цена</th>
+                          <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Трейдер</th>
+                          <th className="text-left py-2 px-2 font-semibold text-muted-foreground">USDT</th>
+                          <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Лимиты (₽)</th>
+                          <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Оплата</th>
+                          <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Сделок</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -245,59 +360,72 @@ const Index = () => {
                               offer.side === 'sell' ? 'bg-sell' : 'bg-buy'
                             } ${getPriceChangeClass(offer.id)}`}
                           >
-                            <td className={`py-3 px-4 font-bold text-xl transition-all duration-300 ${offer.side === 'sell' ? 'text-sell' : 'text-buy'}`}>
-                              <div className="flex items-center gap-2">
+                            <td className={`py-2 px-2 font-bold text-base transition-all duration-300 ${offer.side === 'sell' ? 'text-sell' : 'text-buy'}`}>
+                              <div className="flex items-center gap-1">
                                 {offer.price.toFixed(2)} ₽
                                 {priceChanges[offer.id] === 'up' && (
-                                  <Icon name="TrendingUp" size={16} className="text-success animate-fade-in" />
+                                  <Icon name="TrendingUp" size={12} className="text-success animate-fade-in" />
                                 )}
                                 {priceChanges[offer.id] === 'down' && (
-                                  <Icon name="TrendingDown" size={16} className="text-destructive animate-fade-in" />
+                                  <Icon name="TrendingDown" size={12} className="text-destructive animate-fade-in" />
                                 )}
                                 {priceChanges[offer.id] === 'new' && (
-                                  <Badge variant="outline" className="text-xs animate-fade-in">NEW</Badge>
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0 animate-fade-in">NEW</Badge>
                                 )}
                               </div>
                             </td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-2">
+                            <td className="py-2 px-2">
+                              <div className="flex items-center gap-1">
                                 <div className="flex flex-col">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1">
+                                    {offer.is_online && (
+                                      <div className="w-1.5 h-1.5 rounded-full bg-success" title="Онлайн" />
+                                    )}
                                     <span className="font-semibold text-foreground">{offer.maker}</span>
                                     {offer.is_merchant && (
-                                      <Badge variant="secondary" className="text-xs bg-primary/20 text-primary border-primary/30">
-                                        <Icon name="BadgeCheck" size={12} className="mr-1" />
-                                        Merchant
+                                      <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-primary/20 text-primary border-primary/30">
+                                        <Icon name="BadgeCheck" size={10} className="mr-0.5" />
+                                        M
+                                      </Badge>
+                                    )}
+                                    {offer.is_triangle && (
+                                      <Badge variant="outline" className="text-[10px] px-1 py-0 border-yellow-500/50 text-yellow-500">
+                                        △
                                       </Badge>
                                     )}
                                   </div>
-                                  <span className="text-xs text-muted-foreground">ID: {offer.maker_id}</span>
+                                  <span className="text-[10px] text-muted-foreground">ID: {offer.maker_id}</span>
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 px-4 text-foreground font-medium">
-                              {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USDT
+                            <td className="py-2 px-2 text-foreground font-medium">
+                              {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                             </td>
-                            <td className="py-3 px-4 text-muted-foreground text-sm">
-                              {offer.min_amount.toLocaleString('ru-RU')} - {offer.max_amount.toLocaleString('ru-RU')} ₽
+                            <td className="py-2 px-2 text-muted-foreground">
+                              {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} - {offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                             </td>
-                            <td className="py-3 px-4">
-                              <div className="flex flex-wrap gap-1">
+                            <td className="py-2 px-2">
+                              <div className="flex flex-wrap gap-0.5">
                                 {offer.payment_methods.length > 0 ? (
-                                  offer.payment_methods.map((method, idx) => (
-                                    <Badge key={idx} variant="outline" className="text-xs">
+                                  offer.payment_methods.slice(0, 2).map((method, idx) => (
+                                    <Badge key={idx} variant="outline" className="text-[10px] px-1 py-0">
                                       {method}
                                     </Badge>
                                   ))
                                 ) : (
-                                  <span className="text-xs text-muted-foreground">Не указаны</span>
+                                  <span className="text-[10px] text-muted-foreground">—</span>
+                                )}
+                                {offer.payment_methods.length > 2 && (
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                    +{offer.payment_methods.length - 2}
+                                  </Badge>
                                 )}
                               </div>
                             </td>
-                            <td className="py-3 px-4">
-                              <div className="flex flex-col text-sm">
+                            <td className="py-2 px-2">
+                              <div className="flex flex-col">
                                 <span className="text-foreground font-medium">{offer.completion_rate.toFixed(0)}</span>
-                                <span className="text-xs text-muted-foreground">{offer.total_orders}% завершено</span>
+                                <span className="text-[10px] text-muted-foreground">{offer.total_orders}%</span>
                               </div>
                             </td>
                           </tr>
@@ -305,9 +433,9 @@ const Index = () => {
                       </tbody>
                     </table>
                     {currentOffers.length === 0 && !isLoading && (
-                      <div className="text-center py-12">
-                        <Icon name="SearchX" size={48} className="mx-auto text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">Объявления не найдены</p>
+                      <div className="text-center py-8">
+                        <Icon name="SearchX" size={36} className="mx-auto text-muted-foreground mb-3" />
+                        <p className="text-sm text-muted-foreground">Объявления не найдены</p>
                       </div>
                     )}
                   </div>

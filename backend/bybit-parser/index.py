@@ -97,19 +97,25 @@ def handler(event: dict, context) -> dict:
                     if isinstance(p, dict):
                         payment_methods.append(p.get('name', ''))
                 
+                min_amt = float(item.get('minAmount', 0))
+                max_amt = float(item.get('maxAmount', 0))
+                is_triangle = abs(max_amt - min_amt) <= 1.0
+                
                 offer = {
                     'id': str(item.get('id', '')),
                     'price': float(item.get('price', 0)),
                     'maker': str(item.get('nickName', 'Unknown')),
                     'maker_id': str(item.get('userId', '')),
                     'quantity': float(item.get('lastQuantity', 0)),
-                    'min_amount': float(item.get('minAmount', 0)),
-                    'max_amount': float(item.get('maxAmount', 0)),
+                    'min_amount': min_amt,
+                    'max_amount': max_amt,
                     'payment_methods': payment_methods,
                     'side': 'sell' if side == '1' else 'buy',
                     'completion_rate': float(item.get('recentOrderNum', 0)),
                     'total_orders': int(item.get('recentExecuteRate', 0)),
-                    'is_merchant': bool(item.get('authMaker', False))
+                    'is_merchant': bool(item.get('authMaker', False)),
+                    'is_online': bool(item.get('online', False)),
+                    'is_triangle': is_triangle
                 }
                 all_offers.append(offer)
             

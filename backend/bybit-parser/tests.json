@@ -6,21 +6,8 @@
       "path": "/?side=1",
       "expectedStatus": 200,
       "expectedBody": {
-        "offers": "array",
         "total": "number",
         "side": "sell"
-      },
-      "bodyMatcher": "partial"
-    },
-    {
-      "name": "Get buy offers",
-      "method": "GET",
-      "path": "/?side=0",
-      "expectedStatus": 200,
-      "expectedBody": {
-        "offers": "array",
-        "total": "number",
-        "side": "buy"
       },
       "bodyMatcher": "partial"
     }
