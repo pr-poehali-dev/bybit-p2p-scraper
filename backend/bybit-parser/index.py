@@ -43,6 +43,7 @@ def handler(event: dict, context) -> dict:
     params = event.get('queryStringParameters') or {}
     side = str(params.get('side', '1')) if params.get('side') else '1'
     debug = params.get('debug') == 'true'
+    search_user = params.get('search', '').strip()
     
     cache_key = f'offers_{side}'
     now = datetime.now()
@@ -197,7 +198,10 @@ def handler(event: dict, context) -> dict:
                 last_logout_time = item.get('lastLogoutTime', '')
                 
                 # Определяем тип мерчанта по Verified Advertiser тегам
-                # VA = Verified Advertiser (мерчант Bybit)
+                # BA = Block Advertiser (блочный мерчант - высший статус)
+                # VA3 = Gold Verified Advertiser
+                # VA2 = Silver Verified Advertiser
+                # VA1/VA = Bronze Verified Advertiser
                 auth_tags = item.get('authTag', [])
                 if not isinstance(auth_tags, list):
                     auth_tags = []
@@ -205,9 +209,9 @@ def handler(event: dict, context) -> dict:
                 merchant_type = None
                 merchant_badge = None
                 is_merchant = False
+                is_block_trade = 'BA' in auth_tags
                 
-                # Проверяем наличие VA (Verified Advertiser) тегов
-                # VA3 = Gold, VA2 = Silver, VA1/VA = Bronze
+                # Определяем уровень VA (Verified Advertiser)
                 if 'VA3' in auth_tags:
                     merchant_type = 'gold'
                     merchant_badge = 'vaGoldIcon'
@@ -236,6 +240,7 @@ def handler(event: dict, context) -> dict:
                     'is_merchant': is_merchant,
                     'merchant_type': merchant_type,
                     'merchant_badge': merchant_badge,
+                    'is_block_trade': is_block_trade,
                     'is_online': is_online,
                     'is_triangle': is_triangle,
                     'last_logout_time': last_logout_time,
@@ -249,14 +254,23 @@ def handler(event: dict, context) -> dict:
             time.sleep(random.uniform(0.3, 0.8))
             page += 1
         
-        result_data = {
-            'offers': all_offers,
-            'total': len(all_offers),
-            'side': 'sell' if side == '1' else 'buy',
-            'pages_loaded': page - 1
-        }
+        if search_user:
+            found_users = [o for o in all_offers if search_user.lower() in o['maker'].lower()]
+            result_data = {
+                'search': search_user,
+                'found': len(found_users),
+                'users': found_users
+            }
+        else:
+            result_data = {
+                'offers': all_offers,
+                'total': len(all_offers),
+                'side': 'sell' if side == '1' else 'buy',
+                'pages_loaded': page - 1
+            }
         
-        cache[cache_key] = (result_data, datetime.now())
+        if not search_user:
+            cache[cache_key] = (result_data, datetime.now())
         
         return {
             'statusCode': 200,

@@ -11,12 +11,13 @@ export interface P2POffer {
   completion_rate: number;
   total_orders: number;
   is_merchant: boolean;
-  merchant_type: 'gold' | 'silver' | 'bronze' | 'block_trade' | null;
+  merchant_type: 'gold' | 'silver' | 'bronze' | null;
   merchant_badge: string | null;
+  is_block_trade: boolean;
   is_online: boolean;
   is_triangle: boolean;
   last_logout_time?: string;
-  auth_status?: number;
+  auth_tags?: string[];
 }
 
 export interface PriceChange {

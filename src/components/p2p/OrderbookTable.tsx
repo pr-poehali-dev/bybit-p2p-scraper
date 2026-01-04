@@ -77,15 +77,19 @@ export const OrderbookTable = ({
                     </td>
                     <td className="py-0 px-1">
                       <div className="flex items-center gap-0.5">
-                        {offer.is_merchant && offer.merchant_type === 'gold' ? (
+                        {offer.is_merchant && offer.merchant_type === 'gold' && (
                           <img src="https://www.bybit.com/p2p/static/media/vaGoldIcon.b23a7c43c4096b78ef71.png" alt="Золотой мерчант" className="w-[14px] h-[14px] flex-shrink-0" title="Золотой мерчант" />
-                        ) : offer.is_merchant && offer.merchant_type === 'silver' ? (
+                        )}
+                        {offer.is_merchant && offer.merchant_type === 'silver' && (
                           <img src="https://www.bybit.com/p2p/static/media/vaSilverIcon.8a83d2497a7eccc3612a.png" alt="Серебряный мерчант" className="w-[14px] h-[14px] flex-shrink-0" title="Серебряный мерчант" />
-                        ) : offer.is_merchant && offer.merchant_type === 'bronze' ? (
+                        )}
+                        {offer.is_merchant && offer.merchant_type === 'bronze' && (
                           <img src="https://www.bybit.com/p2p/static/media/vaBronzeIcon.c5efb09734d07fde15b7.png" alt="Бронзовый мерчант" className="w-[14px] h-[14px] flex-shrink-0" title="Бронзовый мерчант" />
-                        ) : offer.is_merchant && offer.merchant_type === 'block_trade' ? (
-                          <img src="https://www.bybit.com/p2p/static/media/baIcon.69355c7c5637b10dbbc525e40a629961.svg" alt="Мерчант блочной торговли" className="w-[14px] h-[14px] flex-shrink-0" title="Мерчант блочной торговли" />
-                        ) : (
+                        )}
+                        {offer.is_block_trade && (
+                          <img src="https://www.bybit.com/p2p/static/media/baIcon.69355c7c5637b10dbbc525e40a629961.svg" alt="Блочный мерчант" className="w-[14px] h-[14px] flex-shrink-0" title="Блочный мерчант" />
+                        )}
+                        {!offer.is_merchant && !offer.is_block_trade && (
                           <span className="w-[14px] flex-shrink-0"></span>
                         )}
                         <span 
