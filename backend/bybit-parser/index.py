@@ -101,6 +101,24 @@ def handler(event: dict, context) -> dict:
                 max_amt = float(item.get('maxAmount', 0))
                 is_triangle = abs(max_amt - min_amt) <= 1.0
                 
+                # Определяем тип мерчанта
+                auth_maker = bool(item.get('authMaker', False))
+                merchant_type = None
+                if auth_maker:
+                    user_type = item.get('userType', 0)
+                    if user_type == 2:
+                        merchant_type = 'block_trade'
+                    else:
+                        merchant_type = 'verified'
+                
+                # Онлайн статус - проверяем lastOnlineTime
+                last_online = item.get('lastOnlineTime', 0)
+                current_time = item.get('currentTime', 0)
+                if current_time and last_online:
+                    is_online = (current_time - last_online) < 60000
+                else:
+                    is_online = bool(item.get('online', False))
+                
                 offer = {
                     'id': str(item.get('id', '')),
                     'price': float(item.get('price', 0)),
@@ -113,9 +131,11 @@ def handler(event: dict, context) -> dict:
                     'side': 'sell' if side == '1' else 'buy',
                     'completion_rate': float(item.get('recentOrderNum', 0)),
                     'total_orders': int(item.get('recentExecuteRate', 0)),
-                    'is_merchant': bool(item.get('authMaker', False)),
-                    'is_online': bool(item.get('online', False)),
-                    'is_triangle': is_triangle
+                    'is_merchant': auth_maker,
+                    'merchant_type': merchant_type,
+                    'is_online': is_online,
+                    'is_triangle': is_triangle,
+                    'last_online_time': last_online
                 }
                 all_offers.append(offer)
             
