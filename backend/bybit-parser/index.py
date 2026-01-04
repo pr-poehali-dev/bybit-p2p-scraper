@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from datetime import datetime, timedelta
 
 cache = {}
-CACHE_TTL = 10
+CACHE_TTL = 8
 
 def handler(event: dict, context) -> dict:
     '''
@@ -67,10 +67,15 @@ def handler(event: dict, context) -> dict:
         
         user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0'
         ]
         
         all_offers = []
@@ -93,15 +98,33 @@ def handler(event: dict, context) -> dict:
                 'canTrade': False
             }
         
+            accept_languages = [
+                'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                'ru-RU,ru;q=0.9,en;q=0.8',
+                'en-US,en;q=0.9,ru;q=0.8',
+                'ru;q=0.9,en-US;q=0.8,en;q=0.7'
+            ]
+            
+            referers = [
+                'https://www.bybit.com/fiat/trade/otc/',
+                'https://www.bybit.com/fiat/trade/otc/?actionType=1&token=USDT&fiat=RUB',
+                'https://www.bybit.com/en/trade/spot/BTC/USDT',
+                'https://www.bybit.com/'
+            ]
+            
             headers = {
                 'Content-Type': 'application/json',
                 'User-Agent': random.choice(user_agents),
                 'Accept': 'application/json',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept-Language': random.choice(accept_languages),
+                'Accept-Encoding': 'gzip, deflate, br',
                 'Origin': 'https://www.bybit.com',
-                'Referer': 'https://www.bybit.com/fiat/trade/otc/',
+                'Referer': random.choice(referers),
                 'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
+                'Pragma': 'no-cache',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-site'
             }
             
             try:

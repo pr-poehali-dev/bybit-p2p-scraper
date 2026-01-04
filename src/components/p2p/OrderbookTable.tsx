@@ -39,7 +39,7 @@ export const OrderbookTable = ({
             <Icon name="Loader2" size={24} className="animate-spin text-primary" />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
             <table className="w-full text-[10px]">
               <thead>
                 <tr className="border-b border-border">
