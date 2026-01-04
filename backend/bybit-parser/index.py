@@ -2,11 +2,39 @@ import json
 import requests
 import random
 import time
+import logging
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 
+# Импорт модулей прокси-менеджера
+from proxy_manager import ProxyManager
+from config import (
+    PROXIES, 
+    REQUEST_TIMEOUT, 
+    MAX_RETRIES, 
+    REQUEST_DELAY_RANGE,
+    PROXY_USE_PROBABILITY,
+    ENABLE_PROXY_LOGGING
+)
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
 cache = {}
 CACHE_TTL = 8
+
+# Инициализация глобального прокси-менеджера
+proxy_manager = ProxyManager(
+    proxies_list=PROXIES,
+    use_probability=PROXY_USE_PROBABILITY,
+    max_retries=MAX_RETRIES,
+    timeout=REQUEST_TIMEOUT,
+    enable_logging=ENABLE_PROXY_LOGGING
+)
 
 def handler(event: dict, context) -> dict:
     '''
@@ -78,17 +106,9 @@ def handler(event: dict, context) -> dict:
             'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0'
         ]
         
-        proxies_list = [
-            {'http': 'http://Vxh6Kjy8:Kfv2bLct@157.22.11.191:63616', 'https': 'http://Vxh6Kjy8:Kfv2bLct@157.22.11.191:63616'},
-            {'http': 'http://Vxh6Kjy8:Kfv2bLct@153.80.66.167:64486', 'https': 'http://Vxh6Kjy8:Kfv2bLct@153.80.66.167:64486'},
-            {'http': 'http://Vxh6Kjy8:Kfv2bLct@45.144.37.156:62948', 'https': 'http://Vxh6Kjy8:Kfv2bLct@45.144.37.156:62948'}
-        ]
-        
         all_offers = []
         page = 1
         max_pages = 10
-        retry_count = 0
-        max_retries = 3
         
         while page <= max_pages:
             payload = {
@@ -133,36 +153,26 @@ def handler(event: dict, context) -> dict:
                 'Sec-Fetch-Site': 'same-site'
             }
             
-            try:
-                # Пробуем с прокси, при ошибке - без прокси
-                proxy = random.choice(proxies_list) if random.random() > 0.3 else None
-                try:
-                    response = requests.post(url, json=payload, headers=headers, proxies=proxy, timeout=15)
-                except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError):
-                    # Если прокси не работает - делаем запрос напрямую
-                    response = requests.post(url, json=payload, headers=headers, timeout=15)
-                
-                if response.status_code == 429:
-                    if retry_count < max_retries:
-                        retry_count += 1
-                        wait_time = random.uniform(2, 5)
-                        time.sleep(wait_time)
-                        continue
-                    else:
-                        break
-                
-                if response.status_code != 200:
-                    break
-                    
-                retry_count = 0
-                
-            except requests.exceptions.RequestException:
-                if retry_count < max_retries:
-                    retry_count += 1
-                    time.sleep(random.uniform(1, 3))
-                    continue
-                else:
-                    break
+            # Используем прокси-менеджер для выполнения запроса
+            response = proxy_manager.make_request(
+                method='POST',
+                url=url,
+                json=payload,
+                headers=headers
+            )
+            
+            # Если запрос не удался - прерываем пагинацию
+            if response is None:
+                break
+            
+            # Обработка rate limit (429)
+            if response.status_code == 429:
+                time.sleep(random.uniform(2, 5))
+                continue
+            
+            # Если не 200 - прерываем
+            if response.status_code != 200:
+                break
             
             response_data = response.json()
             
@@ -286,7 +296,8 @@ def handler(event: dict, context) -> dict:
             if len(items) < 100:
                 break
             
-            time.sleep(random.uniform(0.3, 0.8))
+            # Задержка между запросами из конфига
+            time.sleep(random.uniform(*REQUEST_DELAY_RANGE))
             page += 1
         
         if search_user:
@@ -301,19 +312,28 @@ def handler(event: dict, context) -> dict:
                 'offers': all_offers,
                 'total': len(all_offers),
                 'side': 'sell' if side == '1' else 'buy',
-                'pages_loaded': page - 1
+                'pages_loaded': page - 1,
+                'proxy_stats': proxy_manager.get_stats()  # Статистика прокси
             }
         
         if not search_user:
             cache[cache_key] = (result_data, datetime.now())
         
+        headers_dict = {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'X-Cache': 'MISS'
+        }
+        
+        # Добавляем статистику прокси в заголовки для мониторинга
+        stats = proxy_manager.get_stats()
+        if stats['total_requests'] > 0:
+            headers_dict['X-Proxy-Success-Rate'] = f"{stats.get('success_rate', 0):.1f}%"
+            headers_dict['X-Proxy-Usage'] = f"{stats.get('proxy_usage_rate', 0):.1f}%"
+        
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'X-Cache': 'MISS'
-            },
+            'headers': headers_dict,
             'body': json.dumps(result_data),
             'isBase64Encoded': False
         }

@@ -15,6 +15,7 @@ const Index = () => {
   const [priceChanges, setPriceChanges] = useState<PriceChange>({});
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [proxyStats, setProxyStats] = useState<any>(null);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -87,6 +88,11 @@ const Index = () => {
       } else {
         detectPriceChanges(newOffers, prevOffersRef.current);
         setBuyOffers(newOffers);
+      }
+      
+      // Сохраняем статистику прокси (если есть)
+      if (data.proxy_stats) {
+        setProxyStats(data.proxy_stats);
       }
       
       setLastUpdate(new Date());
@@ -198,6 +204,11 @@ const Index = () => {
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
                 {lastUpdate.toLocaleTimeString('ru-RU')}
+                {proxyStats && proxyStats.success_rate && (
+                  <span className="ml-2 text-[9px] opacity-60" title="Proxy Success Rate">
+                    🔒 {proxyStats.success_rate.toFixed(0)}%
+                  </span>
+                )}
               </div>
             )}
             <Button 
