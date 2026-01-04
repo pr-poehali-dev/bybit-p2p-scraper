@@ -75,7 +75,7 @@ const Index = () => {
   const [priceChanges, setPriceChanges] = useState<PriceChange>({});
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<'sell' | 'buy'>('sell');
+
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
   // Filters
@@ -102,7 +102,7 @@ const Index = () => {
     
     setTimeout(() => {
       setPriceChanges({});
-    }, 2000);
+    }, 3000);
 
     const newPriceMap = new Map<string, number>();
     newOffers.forEach(offer => {
@@ -167,10 +167,8 @@ const Index = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredOffers = useMemo(() => {
-    const offers = activeTab === 'sell' ? sellOffers : buyOffers;
-    
-    return offers.filter(offer => {
+  const filteredSellOffers = useMemo(() => {
+    return sellOffers.filter(offer => {
       if (onlyMerchants && !offer.is_merchant) return false;
       if (onlyOnline && !offer.is_online) return false;
       if (noTriangle && offer.is_triangle) return false;
@@ -187,9 +185,29 @@ const Index = () => {
       
       return true;
     });
-  }, [sellOffers, buyOffers, activeTab, onlyMerchants, onlyOnline, noTriangle, minLimit, maxLimit]);
+  }, [sellOffers, onlyMerchants, onlyOnline, noTriangle, minLimit, maxLimit]);
 
-  const currentOffers = filteredOffers;
+  const filteredBuyOffers = useMemo(() => {
+    return buyOffers.filter(offer => {
+      if (onlyMerchants && !offer.is_merchant) return false;
+      if (onlyOnline && !offer.is_online) return false;
+      if (noTriangle && offer.is_triangle) return false;
+      
+      if (minLimit) {
+        const min = parseFloat(minLimit);
+        if (!isNaN(min) && offer.min_amount < min) return false;
+      }
+      
+      if (maxLimit) {
+        const max = parseFloat(maxLimit);
+        if (!isNaN(max) && offer.max_amount > max) return false;
+      }
+      
+      return true;
+    });
+  }, [buyOffers, onlyMerchants, onlyOnline, noTriangle, minLimit, maxLimit]);
+
+  const currentOffers = [...filteredSellOffers, ...filteredBuyOffers];
   const avgPrice = currentOffers.length > 0
     ? currentOffers.reduce((sum, o) => sum + o.price, 0) / currentOffers.length
     : 0;
@@ -208,8 +226,8 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-1 md:p-2">
-      <div className="max-w-[1920px] mx-auto space-y-2">
+    <div className="min-h-screen bg-background p-1">
+      <div className="max-w-[2000px] mx-auto space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Icon name="TrendingUp" size={24} className="text-primary" />
@@ -339,121 +357,269 @@ const Index = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card">
-          <CardContent className="p-2">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'sell' | 'buy')}>
-              <TabsList className="grid w-full max-w-sm grid-cols-2 mb-2 h-7">
-                <TabsTrigger value="sell" className="data-[state=active]:bg-destructive/20 text-[10px] py-1">
-                  <Icon name="TrendingDown" size={12} className="mr-1 text-sell" />
-                  Продажа ({sellOffers.length})
-                </TabsTrigger>
-                <TabsTrigger value="buy" className="data-[state=active]:bg-success/20 text-[10px] py-1">
-                  <Icon name="TrendingUp" size={12} className="mr-1 text-buy" />
-                  Покупка ({buyOffers.length})
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value={activeTab} className="mt-0">
-                {isLoading && currentOffers.length === 0 ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Icon name="Loader2" size={24} className="animate-spin text-primary" />
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[11px]">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-1 px-1.5 font-semibold text-muted-foreground">Цена</th>
-                          <th className="text-left py-1 px-1.5 font-semibold text-muted-foreground">Трейдер</th>
-                          <th className="text-left py-1 px-1.5 font-semibold text-muted-foreground">USDT</th>
-                          <th className="text-left py-1 px-1.5 font-semibold text-muted-foreground">Лимиты</th>
-                          <th className="text-left py-1 px-1.5 font-semibold text-muted-foreground">Оплата</th>
-                          <th className="text-left py-1 px-1.5 font-semibold text-muted-foreground">Сделок</th>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          <Card className="border-border bg-card">
+            <CardContent className="p-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="TrendingDown" size={14} className="text-sell" />
+                <span className="text-xs font-semibold">Продажа ({sellOffers.filter(o => {
+                  if (onlyMerchants && !o.is_merchant) return false;
+                  if (onlyOnline && !o.is_online) return false;
+                  if (noTriangle && o.is_triangle) return false;
+                  if (minLimit && o.min_amount < parseFloat(minLimit)) return false;
+                  if (maxLimit && o.max_amount > parseFloat(maxLimit)) return false;
+                  return true;
+                }).length})</span>
+              </div>
+              {isLoading && sellOffers.length === 0 ? (
+                <div className="flex items-center justify-center py-6">
+                  <Icon name="Loader2" size={24} className="animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground w-6">#</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Цена</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Трейдер</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">USDT</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Лимиты</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Опл</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Сд</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sellOffers.filter(offer => {
+                        if (onlyMerchants && !offer.is_merchant) return false;
+                        if (onlyOnline && !offer.is_online) return false;
+                        if (noTriangle && offer.is_triangle) return false;
+                        if (minLimit) {
+                          const min = parseFloat(minLimit);
+                          if (!isNaN(min) && offer.min_amount < min) return false;
+                        }
+                        if (maxLimit) {
+                          const max = parseFloat(maxLimit);
+                          if (!isNaN(max) && offer.max_amount > max) return false;
+                        }
+                        return true;
+                      }).map((offer, idx) => (
+                        <tr 
+                          key={offer.id} 
+                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 bg-sell ${getPriceChangeClass(offer.id)}`}
+                        >
+                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
+                          <td className="py-0.5 px-1 font-bold text-sell">
+                            <div className="flex items-center gap-0.5">
+                              {offer.price.toFixed(2)}
+                              {priceChanges[offer.id] === 'up' && (
+                                <Icon name="ArrowUp" size={9} className="text-success" />
+                              )}
+                              {priceChanges[offer.id] === 'down' && (
+                                <Icon name="ArrowDown" size={9} className="text-destructive" />
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <div className="flex items-center gap-0.5">
+                              {offer.is_online && (
+                                <div className="w-1 h-1 rounded-full bg-success flex-shrink-0" />
+                              )}
+                              <span 
+                                className="font-semibold text-foreground truncate max-w-[80px]"
+                                title={`ID: ${offer.maker_id}`}
+                              >
+                                {offer.maker}
+                              </span>
+                              {offer.merchant_type === 'verified' && (
+                                <Icon name="ShieldCheck" size={9} className="text-green-500 flex-shrink-0" title="Проверенный мерчант" />
+                              )}
+                              {offer.merchant_type === 'block_trade' && (
+                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
+                              )}
+                              {offer.is_triangle && (
+                                <span className="text-yellow-500 text-[8px] flex-shrink-0" title="Треугольник">△</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-0.5 px-1 text-foreground font-medium">
+                            {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
+                          </td>
+                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">
+                            {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <div className="flex items-center gap-0.5">
+                              {offer.payment_methods.length > 0 ? (
+                                offer.payment_methods.slice(0, 3).map((method, mIdx) => (
+                                  <div key={mIdx} title={method}>
+                                    <PaymentIcon method={method} />
+                                  </div>
+                                ))
+                              ) : (
+                                <span className="text-[9px] text-muted-foreground">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <div className="flex flex-col leading-none">
+                              <span className="text-foreground font-medium text-[9px]">{offer.completion_rate.toFixed(0)}</span>
+                              <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
+                            </div>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {currentOffers.map((offer) => (
-                          <tr 
-                            key={offer.id} 
-                            className={`border-b border-border/50 hover:bg-secondary/30 transition-all duration-300 ${
-                              offer.side === 'sell' ? 'bg-sell' : 'bg-buy'
-                            } ${getPriceChangeClass(offer.id)}`}
-                          >
-                            <td className={`py-1 px-1.5 font-bold transition-all duration-300 ${offer.side === 'sell' ? 'text-sell' : 'text-buy'}`}>
-                              <div className="flex items-center gap-1">
-                                {offer.price.toFixed(2)}
-                                {priceChanges[offer.id] === 'up' && (
-                                  <Icon name="ArrowUp" size={10} className="text-success" />
-                                )}
-                                {priceChanges[offer.id] === 'down' && (
-                                  <Icon name="ArrowDown" size={10} className="text-destructive" />
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-1 px-1.5">
-                              <div className="flex items-center gap-1">
-                                {offer.is_online && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-success flex-shrink-0" />
-                                )}
-                                <span 
-                                  className="font-semibold text-foreground truncate max-w-[120px]"
-                                  title={`ID: ${offer.maker_id}`}
-                                >
-                                  {offer.maker}
-                                </span>
-                                {offer.merchant_type === 'verified' && (
-                                  <Icon name="ShieldCheck" size={11} className="text-green-500 flex-shrink-0" title="Проверенный мерчант" />
-                                )}
-                                {offer.merchant_type === 'block_trade' && (
-                                  <Icon name="Blocks" size={11} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
-                                )}
-                                {offer.is_triangle && (
-                                  <span className="text-yellow-500 text-[10px] flex-shrink-0" title="Треугольник">△</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-1 px-1.5 text-foreground font-medium">
-                              {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                            </td>
-                            <td className="py-1 px-1.5 text-muted-foreground">
-                              {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                            </td>
-                            <td className="py-1 px-1.5">
-                              <div className="flex items-center gap-0.5 flex-wrap">
-                                {offer.payment_methods.length > 0 ? (
-                                  offer.payment_methods.slice(0, 4).map((method, idx) => (
-                                    <div key={idx} title={method} className="flex items-center">
-                                      <PaymentIcon method={method} />
-                                    </div>
-                                  ))
-                                ) : (
-                                  <span className="text-[10px] text-muted-foreground">—</span>
-                                )}
-                                {offer.payment_methods.length > 4 && (
-                                  <span className="text-[9px] text-muted-foreground">+{offer.payment_methods.length - 4}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-1 px-1.5">
-                              <div className="flex flex-col leading-tight">
-                                <span className="text-foreground font-medium">{offer.completion_rate.toFixed(0)}</span>
-                                <span className="text-[9px] text-muted-foreground">{offer.total_orders}%</span>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {currentOffers.length === 0 && !isLoading && (
-                      <div className="text-center py-6">
-                        <Icon name="SearchX" size={32} className="mx-auto text-muted-foreground mb-2" />
-                        <p className="text-xs text-muted-foreground">Объявления не найдены</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sellOffers.filter(offer => {
+                    if (onlyMerchants && !offer.is_merchant) return false;
+                    if (onlyOnline && !offer.is_online) return false;
+                    if (noTriangle && offer.is_triangle) return false;
+                    if (minLimit && offer.min_amount < parseFloat(minLimit)) return false;
+                    if (maxLimit && offer.max_amount > parseFloat(maxLimit)) return false;
+                    return true;
+                  }).length === 0 && !isLoading && (
+                    <div className="text-center py-4">
+                      <Icon name="SearchX" size={24} className="mx-auto text-muted-foreground mb-1" />
+                      <p className="text-[10px] text-muted-foreground">Нет объявлений</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardContent className="p-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="TrendingUp" size={14} className="text-buy" />
+                <span className="text-xs font-semibold">Покупка ({buyOffers.filter(o => {
+                  if (onlyMerchants && !o.is_merchant) return false;
+                  if (onlyOnline && !o.is_online) return false;
+                  if (noTriangle && o.is_triangle) return false;
+                  if (minLimit && o.min_amount < parseFloat(minLimit)) return false;
+                  if (maxLimit && o.max_amount > parseFloat(maxLimit)) return false;
+                  return true;
+                }).length})</span>
+              </div>
+              {isLoading && buyOffers.length === 0 ? (
+                <div className="flex items-center justify-center py-6">
+                  <Icon name="Loader2" size={24} className="animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground w-6">#</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Цена</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Трейдер</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">USDT</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Лимиты</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Опл</th>
+                        <th className="text-left py-1 px-1 font-semibold text-muted-foreground">Сд</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {buyOffers.filter(offer => {
+                        if (onlyMerchants && !offer.is_merchant) return false;
+                        if (onlyOnline && !offer.is_online) return false;
+                        if (noTriangle && offer.is_triangle) return false;
+                        if (minLimit) {
+                          const min = parseFloat(minLimit);
+                          if (!isNaN(min) && offer.min_amount < min) return false;
+                        }
+                        if (maxLimit) {
+                          const max = parseFloat(maxLimit);
+                          if (!isNaN(max) && offer.max_amount > max) return false;
+                        }
+                        return true;
+                      }).map((offer, idx) => (
+                        <tr 
+                          key={offer.id} 
+                          className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 bg-buy ${getPriceChangeClass(offer.id)}`}
+                        >
+                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
+                          <td className="py-0.5 px-1 font-bold text-buy">
+                            <div className="flex items-center gap-0.5">
+                              {offer.price.toFixed(2)}
+                              {priceChanges[offer.id] === 'up' && (
+                                <Icon name="ArrowUp" size={9} className="text-success" />
+                              )}
+                              {priceChanges[offer.id] === 'down' && (
+                                <Icon name="ArrowDown" size={9} className="text-destructive" />
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <div className="flex items-center gap-0.5">
+                              {offer.is_online && (
+                                <div className="w-1 h-1 rounded-full bg-success flex-shrink-0" />
+                              )}
+                              <span 
+                                className="font-semibold text-foreground truncate max-w-[80px]"
+                                title={`ID: ${offer.maker_id}`}
+                              >
+                                {offer.maker}
+                              </span>
+                              {offer.merchant_type === 'verified' && (
+                                <Icon name="ShieldCheck" size={9} className="text-green-500 flex-shrink-0" title="Проверенный мерчант" />
+                              )}
+                              {offer.merchant_type === 'block_trade' && (
+                                <Icon name="Blocks" size={9} className="text-blue-500 flex-shrink-0" title="Мерчант блочной торговли" />
+                              )}
+                              {offer.is_triangle && (
+                                <span className="text-yellow-500 text-[8px] flex-shrink-0" title="Треугольник">△</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-0.5 px-1 text-foreground font-medium">
+                            {offer.quantity.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
+                          </td>
+                          <td className="py-0.5 px-1 text-muted-foreground text-[9px]">
+                            {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <div className="flex items-center gap-0.5">
+                              {offer.payment_methods.length > 0 ? (
+                                offer.payment_methods.slice(0, 3).map((method, mIdx) => (
+                                  <div key={mIdx} title={method}>
+                                    <PaymentIcon method={method} />
+                                  </div>
+                                ))
+                              ) : (
+                                <span className="text-[9px] text-muted-foreground">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <div className="flex flex-col leading-none">
+                              <span className="text-foreground font-medium text-[9px]">{offer.completion_rate.toFixed(0)}</span>
+                              <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {buyOffers.filter(offer => {
+                    if (onlyMerchants && !offer.is_merchant) return false;
+                    if (onlyOnline && !offer.is_online) return false;
+                    if (noTriangle && offer.is_triangle) return false;
+                    if (minLimit && offer.min_amount < parseFloat(minLimit)) return false;
+                    if (maxLimit && offer.max_amount > parseFloat(maxLimit)) return false;
+                    return true;
+                  }).length === 0 && !isLoading && (
+                    <div className="text-center py-4">
+                      <Icon name="SearchX" size={24} className="mx-auto text-muted-foreground mb-1" />
+                      <p className="text-[10px] text-muted-foreground">Нет объявлений</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
           </CardContent>
         </Card>
       </div>
