@@ -3,7 +3,6 @@ import Icon from '@/components/ui/icon';
 import { P2POffer, PriceChange } from './types';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
 import { memo, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface OrderbookTableProps {
   title: string;
@@ -21,15 +20,7 @@ const OfferRow = memo(({ offer, idx, icon, textClass, priceChanges, getPriceChan
   const isRedHighlighted = RED_HIGHLIGHTED_IDS.includes(offer.maker_id);
   
   return (
-    <motion.tr
-      layout
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ 
-        layout: { duration: 0.2, ease: "easeInOut" },
-        opacity: { duration: 0.15 }
-      }} 
+    <tr
       key={offer.id} 
       style={{
         backgroundColor: isHighlighted 
@@ -40,7 +31,7 @@ const OfferRow = memo(({ offer, idx, icon, textClass, priceChanges, getPriceChan
               ? (icon === 'TrendingDown' ? '#E9967A33' : '#00FF0033')
               : (icon === 'TrendingDown' ? '#E9967A11' : '#00FF0011')
       }}
-      className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} ${isHighlighted ? 'border-l-4 border-l-yellow-500' : ''} ${isRedHighlighted ? 'border-l-4 border-l-red-500' : ''} hover:bg-secondary/30 transition-all duration-300 ${getPriceChangeClass(offer.id)}`}
+      className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} ${isHighlighted ? 'border-l-4 border-l-yellow-500' : ''} ${isRedHighlighted ? 'border-l-4 border-l-red-500' : ''} hover:bg-secondary/30 ${getPriceChangeClass(offer.id)}`}
     >
       <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
       <td className={`py-0 px-1 font-bold ${textClass}`}>
@@ -97,7 +88,7 @@ const OfferRow = memo(({ offer, idx, icon, textClass, priceChanges, getPriceChan
           <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
         </div>
       </td>
-    </motion.tr>
+    </tr>
   );
 });
 
@@ -157,21 +148,19 @@ export const OrderbookTable = memo(({
                 </tr>
               </thead>
               <tbody>
-                <AnimatePresence mode="popLayout">
-                  {offers.map((offer, idx) => (
-                    <OfferRow 
-                      key={`${offer.maker_id}-${offer.price}`}
-                      offer={offer}
-                      idx={idx}
-                      icon={icon}
-                      textClass={textClass}
-                      priceChanges={priceChanges}
-                      getPriceChangeClass={getPriceChangeClass}
-                      HIGHLIGHTED_IDS={HIGHLIGHTED_IDS}
-                      RED_HIGHLIGHTED_IDS={RED_HIGHLIGHTED_IDS}
-                    />
-                  ))}
-                </AnimatePresence>
+                {offers.map((offer, idx) => (
+                  <OfferRow 
+                    key={`${offer.maker_id}-${offer.price}`}
+                    offer={offer}
+                    idx={idx}
+                    icon={icon}
+                    textClass={textClass}
+                    priceChanges={priceChanges}
+                    getPriceChangeClass={getPriceChangeClass}
+                    HIGHLIGHTED_IDS={HIGHLIGHTED_IDS}
+                    RED_HIGHLIGHTED_IDS={RED_HIGHLIGHTED_IDS}
+                  />
+                ))}
               </tbody>
             </table>
             {offers.length === 0 && !isLoading && (
