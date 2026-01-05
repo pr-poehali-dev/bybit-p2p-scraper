@@ -12,6 +12,8 @@ interface FiltersPanelProps {
   setNoTriangle: (value: boolean) => void;
   amountLimit: string;
   setAmountLimit: (value: string) => void;
+  paymentMethod: string;
+  setPaymentMethod: (value: string) => void;
 }
 
 export const FiltersPanel = ({
@@ -23,6 +25,8 @@ export const FiltersPanel = ({
   setNoTriangle,
   amountLimit,
   setAmountLimit,
+  paymentMethod,
+  setPaymentMethod,
 }: FiltersPanelProps) => {
   return (
     <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-1">
@@ -42,6 +46,22 @@ export const FiltersPanel = ({
             <div className="flex items-center space-x-1">
               <Switch id="notriangle" checked={noTriangle} onCheckedChange={setNoTriangle} className="scale-[0.65]" />
               <Label htmlFor="notriangle" className="text-[9px] cursor-pointer whitespace-nowrap">Без ∆</Label>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Label htmlFor="paymentMethod" className="text-[9px] whitespace-nowrap">Оплата:</Label>
+              <select 
+                id="paymentMethod"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="h-5 text-[9px] px-1 bg-background border border-input rounded-md"
+              >
+                <option value="">Все</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Mobile Top-up">Mobile Top-up</option>
+                <option value="Cash Deposit">Cash Deposit</option>
+                <option value="Наличные">Наличные</option>
+              </select>
             </div>
 
             <div className="flex items-center gap-1">

@@ -26,6 +26,7 @@ const Index = () => {
   const [onlyOnline, setOnlyOnline] = useState(false);
   const [noTriangle, setNoTriangle] = useState(false);
   const [amountLimit, setAmountLimit] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
 
   const detectPriceChanges = (newOffers: P2POffer[], prevOffers: Map<string, number>) => {
     const changes: PriceChange = {};
@@ -174,6 +175,8 @@ const Index = () => {
       if (onlyOnline && !offer.is_online) return false;
       if (noTriangle && offer.is_triangle) return false;
       
+      if (paymentMethod && !offer.payment_methods.includes(paymentMethod)) return false;
+      
       if (amountLimit) {
         const amount = parseFloat(amountLimit);
         if (!isNaN(amount)) {
@@ -183,7 +186,7 @@ const Index = () => {
       
       return true;
     });
-  }, [sellOffers, onlyMerchants, onlyOnline, noTriangle, amountLimit]);
+  }, [sellOffers, onlyMerchants, onlyOnline, noTriangle, amountLimit, paymentMethod]);
 
   const filteredBuyOffers = useMemo(() => {
     return buyOffers.filter(offer => {
@@ -191,6 +194,8 @@ const Index = () => {
       if (onlyOnline && !offer.is_online) return false;
       if (noTriangle && offer.is_triangle) return false;
       
+      if (paymentMethod && !offer.payment_methods.includes(paymentMethod)) return false;
+      
       if (amountLimit) {
         const amount = parseFloat(amountLimit);
         if (!isNaN(amount)) {
@@ -200,7 +205,7 @@ const Index = () => {
       
       return true;
     });
-  }, [buyOffers, onlyMerchants, onlyOnline, noTriangle, amountLimit]);
+  }, [buyOffers, onlyMerchants, onlyOnline, noTriangle, amountLimit, paymentMethod]);
 
   const currentOffers = [...filteredSellOffers, ...filteredBuyOffers];
   const avgPrice = currentOffers.length > 0
@@ -226,10 +231,26 @@ const Index = () => {
     <div className="min-h-screen bg-background p-1">
       <div className="max-w-[2000px] mx-auto space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Icon name="TrendingUp" size={24} className="text-primary" />
-            Bybit P2P — USDT/RUB
-          </h1>
+          <div>
+            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <Icon name="TrendingUp" size={24} className="text-primary" />
+              Bybit P2P — USDT/RUB
+            </h1>
+            <div className="flex items-center gap-2 mt-1 text-[9px] text-muted-foreground">
+              <span className="flex items-center gap-0.5">
+                <Icon name="Landmark" size={10} className="text-blue-400" />
+                Bank Transfer
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Icon name="Smartphone" size={10} className="text-purple-400" />
+                Mobile Top-up
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Icon name="Banknote" size={10} className="text-green-400" />
+                Cash / Наличные
+              </span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             {lastUpdate && (
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -286,6 +307,8 @@ const Index = () => {
           setNoTriangle={setNoTriangle}
           amountLimit={amountLimit}
           setAmountLimit={setAmountLimit}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
         />
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
