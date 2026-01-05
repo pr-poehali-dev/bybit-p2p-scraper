@@ -18,6 +18,7 @@ const Index = () => {
   const [proxyStats, setProxyStats] = useState<any>(null);
   const [nextUpdateIn, setNextUpdateIn] = useState<number>(300);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
+  const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -82,6 +83,14 @@ const Index = () => {
       
       if (data.error) {
         throw new Error(data.error);
+      }
+      
+      // Определяем источник данных
+      const cacheHeader = response.headers.get('X-Cache');
+      if (cacheHeader === 'DB-HIT') {
+        setDataSource('db');
+      } else {
+        setDataSource('bybit');
       }
       
       const newOffers = data.offers || [];
@@ -227,6 +236,13 @@ const Index = () => {
                 <div className="flex items-center gap-1.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
                   {lastUpdate.toLocaleTimeString('ru-RU')}
+                  {dataSource && (
+                    <span className={`text-[8px] px-1 py-0.5 rounded ${
+                      dataSource === 'db' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
+                    }`}>
+                      {dataSource === 'db' ? 'БД' : 'Bybit'}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => setAutoUpdateEnabled(!autoUpdateEnabled)}
@@ -272,7 +288,7 @@ const Index = () => {
           setAmountLimit={setAmountLimit}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
           <OrderbookTable
             title="Продажа"
             icon="TrendingDown"

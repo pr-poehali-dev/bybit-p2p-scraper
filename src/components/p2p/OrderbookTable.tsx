@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import { P2POffer, PriceChange } from './types';
-import { PaymentIcon } from './PaymentIcon';
+import { PaymentMethodIcon } from './PaymentMethodIcon';
 
 interface OrderbookTableProps {
   title: string;
@@ -132,17 +132,7 @@ export const OrderbookTable = ({
                       {offer.min_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}-{offer.max_amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                     </td>
                     <td className="py-0 px-1">
-                      <div className="flex items-center gap-0.5">
-                        {offer.payment_methods.length > 0 ? (
-                          offer.payment_methods.slice(0, 3).map((method, mIdx) => (
-                            <div key={mIdx} title={method}>
-                              <PaymentIcon method={method} />
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-[9px] text-muted-foreground">—</span>
-                        )}
-                      </div>
+                      <PaymentMethodIcon methods={offer.payment_methods} />
                     </td>
                     <td className="py-0 px-1">
                       <div className="flex flex-col leading-none">
