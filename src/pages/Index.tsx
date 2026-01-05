@@ -119,6 +119,7 @@ const Index = () => {
 
   const loadAllOffers = async () => {
     setIsLoading(true);
+    setNextUpdateIn(600);
     try {
       await Promise.all([
         fetchOffers('1'),
@@ -131,12 +132,10 @@ const Index = () => {
 
   useEffect(() => {
     loadAllOffers();
-    setNextUpdateIn(600);
     
     // Автообновление каждые 10 минут
     const intervalId = setInterval(() => {
       loadAllOffers();
-      setNextUpdateIn(600);
     }, 10 * 60 * 1000);
     
     // Обратный отсчёт каждую секунду
