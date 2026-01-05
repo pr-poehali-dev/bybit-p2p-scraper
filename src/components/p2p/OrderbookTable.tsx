@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
-import { P2POffer, PriceChange } from './types';
+import { P2POffer } from './types';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
 
 interface OrderbookTableProps {
@@ -8,13 +8,11 @@ interface OrderbookTableProps {
   icon: 'TrendingDown' | 'TrendingUp';
   iconClass: string;
   offers: P2POffer[];
-  priceChanges: PriceChange;
-  getPriceChangeClass: (offerId: string) => string;
   isLoading: boolean;
   allOffersEmpty: boolean;
 }
 
-const OfferRow = ({ offer, idx, icon, textClass, priceChanges, getPriceChangeClass, HIGHLIGHTED_IDS, RED_HIGHLIGHTED_IDS }: any) => {
+const OfferRow = ({ offer, idx, icon, textClass, HIGHLIGHTED_IDS, RED_HIGHLIGHTED_IDS }: any) => {
   const isHighlighted = HIGHLIGHTED_IDS.includes(offer.maker_id);
   const isRedHighlighted = RED_HIGHLIGHTED_IDS.includes(offer.maker_id);
   
@@ -29,19 +27,11 @@ const OfferRow = ({ offer, idx, icon, textClass, priceChanges, getPriceChangeCla
               ? (icon === 'TrendingDown' ? '#E9967A33' : '#00FF0033')
               : (icon === 'TrendingDown' ? '#E9967A11' : '#00FF0011')
       }}
-      className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} ${isHighlighted ? 'border-l-4 border-l-yellow-500' : ''} ${isRedHighlighted ? 'border-l-4 border-l-red-500' : ''} hover:bg-secondary/30 ${getPriceChangeClass(offer.id)}`}
+      className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} ${isHighlighted ? 'border-l-4 border-l-yellow-500' : ''} ${isRedHighlighted ? 'border-l-4 border-l-red-500' : ''} hover:bg-secondary/30`}
     >
       <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
       <td className={`py-0 px-1 font-bold ${textClass}`}>
-        <div className="flex items-center gap-0.5">
-          {offer.price.toFixed(2)}
-          {priceChanges[offer.id] === 'up' && (
-            <Icon name="ArrowUp" size={9} className="text-success" />
-          )}
-          {priceChanges[offer.id] === 'down' && (
-            <Icon name="ArrowDown" size={9} className="text-destructive" />
-          )}
-        </div>
+        {offer.price.toFixed(2)}
       </td>
       <td className="py-0 px-1">
         <div className="flex items-center gap-0.5">
@@ -95,8 +85,6 @@ export const OrderbookTable = ({
   icon,
   iconClass,
   offers,
-  priceChanges,
-  getPriceChangeClass,
   isLoading,
   allOffersEmpty,
 }: OrderbookTableProps) => {
@@ -146,13 +134,11 @@ export const OrderbookTable = ({
               <tbody>
                 {offers.map((offer, idx) => (
                   <OfferRow 
-                    key={offer.id}
+                    key={`${offer.id}-${idx}`}
                     offer={offer}
                     idx={idx}
                     icon={icon}
                     textClass={textClass}
-                    priceChanges={priceChanges}
-                    getPriceChangeClass={getPriceChangeClass}
                     HIGHLIGHTED_IDS={HIGHLIGHTED_IDS}
                     RED_HIGHLIGHTED_IDS={RED_HIGHLIGHTED_IDS}
                   />

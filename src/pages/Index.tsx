@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { P2POffer, PriceChange } from '@/components/p2p/types';
+import { P2POffer } from '@/components/p2p/types';
 import { StatisticsCards } from '@/components/p2p/StatisticsCards';
 import { FiltersPanel } from '@/components/p2p/FiltersPanel';
 import { OrderbookTable } from '@/components/p2p/OrderbookTable';
@@ -12,7 +12,6 @@ const API_URL = 'https://functions.poehali.dev/ea8079f5-9a7d-41e0-9530-698a124a6
 const Index = () => {
   const [sellOffers, setSellOffers] = useState<P2POffer[]>([]);
   const [buyOffers, setBuyOffers] = useState<P2POffer[]>([]);
-  const [priceChanges, setPriceChanges] = useState<PriceChange>({});
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
@@ -25,7 +24,7 @@ const Index = () => {
   const [lastDbUpdateSell, setLastDbUpdateSell] = useState<string | null>(null);
   const [lastDbUpdateBuy, setLastDbUpdateBuy] = useState<string | null>(null);
 
-  const prevOffersRef = useRef<Map<string, number>>(new Map());
+
 
   const [onlyMerchants, setOnlyMerchants] = useState(false);
   const [onlyOnline, setOnlyOnline] = useState(false);
@@ -33,31 +32,7 @@ const Index = () => {
   const [amountLimit, setAmountLimit] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
 
-  const detectPriceChanges = (newOffers: P2POffer[], prevOffers: Map<string, number>) => {
-    const changes: PriceChange = {};
-    
-    newOffers.forEach(offer => {
-      const prevPrice = prevOffers.get(offer.id);
-      
-      if (prevPrice !== undefined && offer.price > prevPrice) {
-        changes[offer.id] = 'up';
-      } else if (prevPrice !== undefined && offer.price < prevPrice) {
-        changes[offer.id] = 'down';
-      }
-    });
 
-    setPriceChanges(changes);
-    
-    setTimeout(() => {
-      setPriceChanges({});
-    }, 3000);
-
-    const newPriceMap = new Map<string, number>();
-    newOffers.forEach(offer => {
-      newPriceMap.set(offer.id, offer.price);
-    });
-    prevOffersRef.current = newPriceMap;
-  };
 
   const fetchOffers = async (side: '1' | '0', silent = false) => {
     try {
@@ -112,10 +87,8 @@ const Index = () => {
       const newOffers = data.offers || [];
       
       if (side === '1') {
-        detectPriceChanges(newOffers, prevOffersRef.current);
         setSellOffers(newOffers);
       } else {
-        detectPriceChanges(newOffers, prevOffersRef.current);
         setBuyOffers(newOffers);
       }
       
@@ -308,10 +281,7 @@ const Index = () => {
   const onlineCount = currentOffers.filter(o => o.is_online).length;
   const triangleCount = currentOffers.filter(o => o.is_triangle).length;
 
-  const getPriceChangeClass = (offerId: string) => {
-    // Убрали bg-success/10 и bg-destructive/10 чтобы избежать "плавания"
-    return '';
-  };
+
 
   return (
     <div className="min-h-screen bg-background p-1">
@@ -427,8 +397,6 @@ const Index = () => {
             icon="TrendingDown"
             iconClass="text-sell"
             offers={filteredSellOffers}
-            priceChanges={priceChanges}
-            getPriceChangeClass={getPriceChangeClass}
             isLoading={isLoading}
             allOffersEmpty={sellOffers.length === 0}
           />
@@ -438,8 +406,6 @@ const Index = () => {
             icon="TrendingUp"
             iconClass="text-buy"
             offers={filteredBuyOffers}
-            priceChanges={priceChanges}
-            getPriceChangeClass={getPriceChangeClass}
             isLoading={isLoading}
             allOffersEmpty={buyOffers.length === 0}
           />
