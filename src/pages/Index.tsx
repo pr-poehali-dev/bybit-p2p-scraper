@@ -277,9 +277,7 @@ const Index = () => {
   const triangleCount = currentOffers.filter(o => o.is_triangle).length;
 
   const getPriceChangeClass = (offerId: string) => {
-    const change = priceChanges[offerId];
-    if (change === 'up') return 'bg-success/10';
-    if (change === 'down') return 'bg-destructive/10';
+    // Убрали bg-success/10 и bg-destructive/10 чтобы избежать "плавания"
     return '';
   };
 
