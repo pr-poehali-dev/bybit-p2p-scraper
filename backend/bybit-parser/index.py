@@ -36,7 +36,7 @@ db_cache = {
     'buy': {'data': None, 'timestamp': None},
     'auto_update_enabled': {'value': True, 'timestamp': None}
 }
-DB_CACHE_TTL_SECONDS = 15  # Кеш БД на 15 секунд (снижает нагрузку на PostgreSQL)
+DB_CACHE_TTL_SECONDS = 25  # Кеш БД на 25 секунд - все пользователи получают одни данные
 
 # Инициализация глобального прокси-менеджера
 proxy_manager = ProxyManager(

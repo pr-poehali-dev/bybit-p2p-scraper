@@ -120,7 +120,7 @@ const Index = () => {
 
   const loadAllOffers = async (forceUpdate = false) => {
     setIsLoading(true);
-    setNextUpdateIn(8);
+    setNextUpdateIn(25);
     
     try {
       const forceSuffix = forceUpdate ? '&force=true' : '';
@@ -241,7 +241,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 8);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 25);
     }, 1000);
     
     return () => {
@@ -252,11 +252,11 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 8 секунд (легкий запрос)
+    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 25 секунд (легкий запрос)
     // Данные грузим только если БД реально обновилась
     const intervalId = setInterval(() => {
       checkStatus(); // Легкий запрос - только проверка timestamp
-    }, 8 * 1000);
+    }, 25 * 1000);
     
     return () => {
       clearInterval(intervalId);
