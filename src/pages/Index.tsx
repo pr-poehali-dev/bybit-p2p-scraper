@@ -16,6 +16,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(600);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -130,13 +131,23 @@ const Index = () => {
 
   useEffect(() => {
     loadAllOffers();
+    setNextUpdateIn(600);
     
     // Автообновление каждые 10 минут
     const intervalId = setInterval(() => {
       loadAllOffers();
-    }, 10 * 60 * 1000); // 10 минут в миллисекундах
+      setNextUpdateIn(600);
+    }, 10 * 60 * 1000);
     
-    return () => clearInterval(intervalId);
+    // Обратный отсчёт каждую секунду
+    const countdownId = setInterval(() => {
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 600);
+    }, 1000);
+    
+    return () => {
+      clearInterval(intervalId);
+      clearInterval(countdownId);
+    };
   }, []);
 
   const filteredSellOffers = useMemo(() => {
@@ -203,11 +214,17 @@ const Index = () => {
           </h1>
           <div className="flex items-center gap-2">
             {lastUpdate && (
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
-                {lastUpdate.toLocaleTimeString('ru-RU')}
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
+                  {lastUpdate.toLocaleTimeString('ru-RU')}
+                </div>
+                <div className="flex items-center gap-1 text-[9px] opacity-70">
+                  <Icon name="Timer" size={10} />
+                  {Math.floor(nextUpdateIn / 60)}:{String(nextUpdateIn % 60).padStart(2, '0')}
+                </div>
                 {proxyStats && proxyStats.success_rate && (
-                  <span className="ml-2 text-[9px] opacity-60" title="Proxy Success Rate">
+                  <span className="text-[9px] opacity-60" title="Proxy Success Rate">
                     🔒 {proxyStats.success_rate.toFixed(0)}%
                   </span>
                 )}
