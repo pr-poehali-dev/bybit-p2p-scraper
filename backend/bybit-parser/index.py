@@ -382,9 +382,22 @@ def handler(event: dict, context) -> dict:
         all_offers = []
         page = 1
         total_items = 0
+        start_time = time.time()
+        MAX_PAGES = 8  # Максимум 8 страниц = 800 офферов (защита от зависания)
+        TIMEOUT_SECONDS = 15  # Общий таймаут на загрузку всех страниц (остаётся запас на сохранение в БД)
         
         # Параллельная загрузка страниц батчами
         while True:
+            # Проверка таймаута
+            elapsed = time.time() - start_time
+            if elapsed > TIMEOUT_SECONDS:
+                logging.warning(f'Timeout reached after {elapsed:.1f}s, stopping at page {page}')
+                break
+            
+            # Проверка лимита страниц
+            if page > MAX_PAGES:
+                logging.warning(f'Max pages limit ({MAX_PAGES}) reached')
+                break
             batch_pages = list(range(page, page + PARALLEL_REQUESTS))
             batch_results = []
             

@@ -26,7 +26,7 @@ REQUEST_DELAY_RANGE = (0.2, 0.5)
 PROXY_USE_PROBABILITY = 0.95
 
 # Параллельная загрузка страниц (количество одновременных запросов)
-PARALLEL_REQUESTS = 3
+PARALLEL_REQUESTS = 5  # У нас 5 прокси - используем все
 
 # Включить логирование прокси
 ENABLE_PROXY_LOGGING = True
