@@ -16,7 +16,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(5);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(30);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
@@ -138,7 +138,7 @@ const Index = () => {
 
   const loadAllOffers = async () => {
     setIsLoading(true);
-    setNextUpdateIn(5);
+    setNextUpdateIn(30);
     try {
       await Promise.all([
         fetchOffers('1', false),
@@ -198,7 +198,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 5);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 30);
     }, 1000);
     
     return () => {
@@ -209,11 +209,11 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // Автообновление каждые 5 секунд (чтение из БД, не тратит лимиты!)
+    // Автообновление каждые 30 секунд (чтение из БД)
     const intervalId = setInterval(() => {
       loadAllOffers();
       checkStatus(); // Проверяем глобальный статус
-    }, 5 * 1000);
+    }, 30 * 1000);
     
     return () => {
       clearInterval(intervalId);
