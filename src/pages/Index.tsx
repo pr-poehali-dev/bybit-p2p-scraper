@@ -125,13 +125,13 @@ const Index = () => {
     try {
       const forceSuffix = forceUpdate ? '&force=true' : '';
       
-      // ШАГ 1: Быстрая загрузка топ-200 для обеих сторон (приоритет)
-      console.log('🚀 [ШАГ 1] Загрузка топ-200 продаж и покупок...');
-      const quickController = new AbortController();
-      const quickTimeoutId = setTimeout(() => quickController.abort(), 10000);
+      // Загружаем топ-200 для обеих сторон (быстро)
+      console.log('🚀 Загрузка топ-200 продаж и покупок...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       await Promise.all([
-        fetch(`${API_URL}?side=1&limit=quick${forceSuffix}`, { signal: quickController.signal })
+        fetch(`${API_URL}?side=1&limit=quick${forceSuffix}`, { signal: controller.signal })
           .then(r => r.json())
           .then(data => {
             if (data.offers) {
@@ -140,7 +140,7 @@ const Index = () => {
             }
             if (typeof data.auto_update_enabled === 'boolean') setGlobalAutoUpdateEnabled(data.auto_update_enabled);
           }),
-        fetch(`${API_URL}?side=0&limit=quick${forceSuffix}`, { signal: quickController.signal })
+        fetch(`${API_URL}?side=0&limit=quick${forceSuffix}`, { signal: controller.signal })
           .then(r => r.json())
           .then(data => {
             if (data.offers) {
@@ -150,38 +150,12 @@ const Index = () => {
           })
       ]);
       
-      clearTimeout(quickTimeoutId);
+      clearTimeout(timeoutId);
       setLastUpdate(new Date());
-      setIsLoading(false);  // Показываем данные пользователю
-      
-      // ШАГ 2: Дозагрузка остальных офферов в фоне (без блокировки UI)
-      console.log('📦 [ШАГ 2] Дозагрузка остальных офферов в фоне...');
-      const fullController = new AbortController();
-      const fullTimeoutId = setTimeout(() => fullController.abort(), 30000);
-      
-      Promise.all([
-        fetch(`${API_URL}?side=1${forceSuffix}`, { signal: fullController.signal })
-          .then(r => r.json())
-          .then(data => {
-            if (data.offers && data.offers.length > 200) {
-              console.log(`📊 Полный стакан продаж: ${data.offers.length} офферов`);
-              setSellOffers(data.offers);
-            }
-          })
-          .catch(err => console.warn('Background sell load failed:', err)),
-        fetch(`${API_URL}?side=0${forceSuffix}`, { signal: fullController.signal })
-          .then(r => r.json())
-          .then(data => {
-            if (data.offers && data.offers.length > 200) {
-              console.log(`📊 Полный стакан покупок: ${data.offers.length} офферов`);
-              setBuyOffers(data.offers);
-            }
-          })
-          .catch(err => console.warn('Background buy load failed:', err))
-      ]).finally(() => clearTimeout(fullTimeoutId));
+      setIsLoading(false);
       
       if (forceUpdate) {
-        toast({ title: 'Принудительное обновление', description: 'Топ-200 загружено, остальное дозагружается...' });
+        toast({ title: 'Принудительное обновление', description: 'Топ-200 загружено!' });
       }
     } catch (error) {
       console.error('Failed to load offers:', error);

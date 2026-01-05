@@ -516,8 +516,9 @@ def handler(event: dict, context) -> dict:
             # Переходим к следующему батчу
             page += PARALLEL_REQUESTS
         
-        # Сохраняем в БД (преобразуем формат для БД)
-        if not search_user:
+        # Сохраняем в БД ТОЛЬКО если это не quick mode (преобразуем формат для БД)
+        # Quick mode не сохраняет - отдаём данные быстро, full mode дозагрузит и сохранит
+        if not search_user and limit != 'quick':
             try:
                 offers_for_db = []
                 for offer in all_offers:
@@ -541,6 +542,8 @@ def handler(event: dict, context) -> dict:
                 logging.info(f'Successfully saved {len(offers_for_db)} offers to database for side {side}')
             except Exception as e:
                 logging.error(f'Failed to save to database: {e}')
+        elif limit == 'quick':
+            logging.info(f'[QUICK MODE] Skipping DB save, returning data immediately')
         
         # Обновляем кеш
         cache[cache_key] = {
