@@ -40,7 +40,7 @@ proxy_manager = ProxyManager(
 # Инициализация менеджера базы данных
 db_manager = DatabaseManager()
 
-UPDATE_INTERVAL_MINUTES = 1
+UPDATE_INTERVAL_SECONDS = 90  # 1.5 минуты = 960 вызовов/сутки
 
 # Маппинг ID методов оплаты Bybit на названия
 PAYMENT_METHOD_MAP = {
@@ -94,11 +94,10 @@ def handler(event: dict, context) -> dict:
     side = str(params.get('side', '1')) if params.get('side') else '1'
     debug = params.get('debug') == 'true'
     search_user = params.get('search', '').strip()
-    force_update = params.get('force') == 'true'
     
     try:
-        # Проверяем, нужно ли обновлять данные (если не force, то проверяем возраст БД)
-        should_fetch = db_manager.should_update(side, UPDATE_INTERVAL_MINUTES)
+        # Проверяем, нужно ли обновлять данные (проверяем возраст БД в секундах)
+        should_fetch = db_manager.should_update_seconds(side, UPDATE_INTERVAL_SECONDS)
         
         if not should_fetch:
             # Возвращаем данные из базы

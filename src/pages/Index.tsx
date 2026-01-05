@@ -16,7 +16,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(300);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(5);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
   const [loadingProgress, setLoadingProgress] = useState<string>('');
@@ -55,12 +55,12 @@ const Index = () => {
     prevOffersRef.current = newPriceMap;
   };
 
-  const fetchOffers = async (side: '1' | '0', silent = false, force = false) => {
+  const fetchOffers = async (side: '1' | '0', silent = false) => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
-      const url = force ? `${API_URL}?side=${side}&force=true` : `${API_URL}?side=${side}`;
+      const url = `${API_URL}?side=${side}`;
       
       const response = await fetch(url, {
         signal: controller.signal,
@@ -131,15 +131,15 @@ const Index = () => {
     }
   };
 
-  const loadAllOffers = async (force = false) => {
+  const loadAllOffers = async () => {
     setIsLoading(true);
-    setNextUpdateIn(300);
-    setLoadingProgress('Загрузка...');
+    setNextUpdateIn(5);
+    setLoadingProgress('Чтение БД...');
     try {
-      setLoadingProgress('Загрузка продажи...');
-      await fetchOffers('1', false, force);
-      setLoadingProgress('Загрузка покупки...');
-      await fetchOffers('0', false, force);
+      await Promise.all([
+        fetchOffers('1', false),
+        fetchOffers('0', false)
+      ]);
       setLoadingProgress('Готово!');
     } finally {
       setIsLoading(false);
@@ -152,7 +152,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 300);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 5);
     }, 1000);
     
     return () => {
@@ -163,10 +163,10 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // Автообновление каждые 5 минут
+    // Автообновление каждые 5 секунд (чтение из БД, не тратит лимиты!)
     const intervalId = setInterval(() => {
-      loadAllOffers(true);
-    }, 5 * 60 * 1000);
+      loadAllOffers();
+    }, 5 * 1000);
     
     return () => {
       clearInterval(intervalId);
@@ -295,12 +295,12 @@ const Index = () => {
                 </span>
               )}
               <Button 
-                onClick={() => loadAllOffers(false)}
+                onClick={() => loadAllOffers()}
                 disabled={isLoading}
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs"
-                title="Обновить данные (из БД или Bybit если БД старше 1 минуты)"
+                title="Обновить данные из БД (БД автоматически обновляется каждые 90 сек)"
               >
                 <Icon name="RefreshCw" size={12} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
                 Обновить

@@ -131,7 +131,7 @@ class DatabaseManager:
             conn.close()
     
     def should_update(self, side: str, interval_minutes: int = 10) -> bool:
-        """Проверка необходимости обновления данных."""
+        """Проверка необходимости обновления данных (в минутах)."""
         last_update = self.get_last_update(side)
         if not last_update:
             return True
@@ -139,3 +139,13 @@ class DatabaseManager:
         now = datetime.now()
         time_diff = (now - last_update).total_seconds() / 60
         return time_diff >= interval_minutes
+    
+    def should_update_seconds(self, side: str, interval_seconds: int = 90) -> bool:
+        """Проверка необходимости обновления данных (в секундах)."""
+        last_update = self.get_last_update(side)
+        if not last_update:
+            return True
+        
+        now = datetime.now()
+        time_diff = (now - last_update).total_seconds()
+        return time_diff >= interval_seconds
