@@ -42,6 +42,22 @@ db_manager = DatabaseManager()
 
 UPDATE_INTERVAL_MINUTES = 1
 
+# Маппинг ID методов оплаты Bybit на названия
+PAYMENT_METHOD_MAP = {
+    '14': 'Bank Transfer',
+    '40': 'Mobile Top-up',
+    '90': 'Cash Deposit',
+    '75': 'Наличные',
+    '64': 'Wallet',
+    '1': 'Card',
+    '29': 'QIWI',
+    '377': 'YooMoney',
+    '378': 'Tinkoff',
+    '379': 'Sberbank',
+    '62': 'Raiffeisen Bank',
+    '413': 'Rosbank'
+}
+
 def handler(event: dict, context) -> dict:
     '''
     Парсинг P2P объявлений Bybit для пары USDT/RUB.
@@ -213,24 +229,15 @@ def handler(event: dict, context) -> dict:
             
             if debug and page == 1 and len(items) > 0:
                 debug_items = []
-                for item in items[:10]:
-                    debug_items.append({
+                for item in items[:3]:
+                    debug_item = {
                         'nickName': item.get('nickName'),
-                        'authMaker': item.get('authMaker'),
-                        'authStatus': item.get('authStatus'),
-                        'authTag': item.get('authTag'),
-                        'userType': item.get('userType'),
-                        'isMerchant': item.get('isMerchant'),
-                        'merchantLevel': item.get('merchantLevel'),
-                        'certificationLevel': item.get('certificationLevel'),
-                        'vaGoldIcon': item.get('vaGoldIcon'),
-                        'vaSilverIcon': item.get('vaSilverIcon'),
-                        'vaBronzeIcon': item.get('vaBronzeIcon'),
-                        'baIcon': item.get('baIcon'),
-                        'recentOrderNum': item.get('recentOrderNum'),
-                        'recentExecuteRate': item.get('recentExecuteRate'),
+                        'payments': item.get('payments', []),
+                        'paymentMethods': item.get('paymentMethods', []),
+                        'payment': item.get('payment', []),
                         'all_keys': list(item.keys())
-                    })
+                    }
+                    debug_items.append(debug_item)
                 debug_info = {
                     'debug': True,
                     'items': debug_items
@@ -254,9 +261,11 @@ def handler(event: dict, context) -> dict:
                     payments = []
                 
                 payment_methods = []
-                for p in payments:
-                    if isinstance(p, dict):
-                        payment_methods.append(p.get('name', ''))
+                for payment_id in payments:
+                    # Payments - это массив ID (строк), например ["14", "40"]
+                    if isinstance(payment_id, str):
+                        payment_name = PAYMENT_METHOD_MAP.get(payment_id, f'Payment #{payment_id}')
+                        payment_methods.append(payment_name)
                 
                 min_amt = float(item.get('minAmount', 0))
                 max_amt = float(item.get('maxAmount', 0))

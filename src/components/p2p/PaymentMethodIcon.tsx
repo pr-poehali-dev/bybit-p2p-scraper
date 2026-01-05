@@ -7,20 +7,33 @@ interface PaymentMethodIconProps {
 const getPaymentIcon = (method: string): { icon: string; color: string; title: string } => {
   const methodLower = method.toLowerCase();
   
-  if (methodLower.includes('bank') || methodLower.includes('transfer') || methodLower.includes('банк')) {
-    return { icon: 'Landmark', color: 'text-blue-400', title: 'Банковский перевод' };
+  // Bank Transfer (Банковский перевод)
+  if (methodLower.includes('bank transfer') || methodLower.includes('tinkoff') || 
+      methodLower.includes('sberbank') || methodLower.includes('raiffeisen') || 
+      methodLower.includes('rosbank') || methodLower.includes('банк')) {
+    return { icon: 'Landmark', color: 'text-blue-400', title: method };
   }
   
-  if (methodLower.includes('cash') || methodLower.includes('наличн')) {
-    return { icon: 'Banknote', color: 'text-green-400', title: 'Наличные' };
+  // Mobile Top-up (Пополнение телефона)
+  if (methodLower.includes('mobile') || methodLower.includes('top-up') || 
+      methodLower.includes('phone') || methodLower.includes('телефон')) {
+    return { icon: 'Smartphone', color: 'text-purple-400', title: method };
   }
   
-  if (methodLower.includes('mobile') || methodLower.includes('phone') || methodLower.includes('телефон')) {
-    return { icon: 'Smartphone', color: 'text-purple-400', title: 'Пополнение телефона' };
+  // Cash Deposit (Наличные)
+  if (methodLower.includes('cash') || methodLower.includes('deposit') || methodLower.includes('наличн')) {
+    return { icon: 'Banknote', color: 'text-green-400', title: method };
   }
   
-  if (methodLower.includes('wallet') || methodLower.includes('кошел')) {
-    return { icon: 'Wallet', color: 'text-orange-400', title: 'Электронный кошелек' };
+  // Wallet (Электронные кошельки)
+  if (methodLower.includes('wallet') || methodLower.includes('кошел') || 
+      methodLower.includes('qiwi') || methodLower.includes('yoomoney')) {
+    return { icon: 'Wallet', color: 'text-orange-400', title: method };
+  }
+  
+  // Card (Карта)
+  if (methodLower.includes('card') || methodLower.includes('карт')) {
+    return { icon: 'CreditCard', color: 'text-yellow-400', title: method };
   }
   
   return { icon: 'CircleDollarSign', color: 'text-gray-400', title: method };
