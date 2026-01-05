@@ -20,7 +20,6 @@ const Index = () => {
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
-  const [loadingProgress, setLoadingProgress] = useState<string>('');
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -140,16 +139,13 @@ const Index = () => {
   const loadAllOffers = async () => {
     setIsLoading(true);
     setNextUpdateIn(5);
-    setLoadingProgress('Чтение БД...');
     try {
       await Promise.all([
         fetchOffers('1', false),
         fetchOffers('0', false)
       ]);
-      setLoadingProgress('Готово!');
     } finally {
       setIsLoading(false);
-      setTimeout(() => setLoadingProgress(''), 500);
     }
   };
 
@@ -340,11 +336,6 @@ const Index = () => {
               </div>
             )}
             <div className="flex items-center gap-1.5">
-              {loadingProgress && (
-                <span className="text-[9px] text-muted-foreground animate-pulse">
-                  {loadingProgress}
-                </span>
-              )}
               <Button 
                 onClick={toggleGlobalAutoUpdate}
                 variant={globalAutoUpdateEnabled ? "default" : "destructive"}
