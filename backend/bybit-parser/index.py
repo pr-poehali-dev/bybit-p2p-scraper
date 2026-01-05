@@ -5,6 +5,7 @@ import time
 import logging
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Импорт модулей прокси-менеджера
 from proxy_manager import ProxyManager
@@ -14,7 +15,8 @@ from config import (
     MAX_RETRIES, 
     REQUEST_DELAY_RANGE,
     PROXY_USE_PROBABILITY,
-    ENABLE_PROXY_LOGGING
+    ENABLE_PROXY_LOGGING,
+    PARALLEL_REQUESTS
 )
 from db_manager import DatabaseManager
 
@@ -57,6 +59,69 @@ PAYMENT_METHOD_MAP = {
     '62': 'Raiffeisen Bank',
     '413': 'Rosbank'
 }
+
+def fetch_page(page: int, side: str, url: str, user_agents: list, accept_languages: list, referers: list) -> tuple:
+    """
+    Загружает одну страницу объявлений параллельно
+    Возвращает: (page_number, items_list, success)
+    """
+    payload = {
+        'userId': '',
+        'tokenId': 'USDT',
+        'currencyId': 'RUB',
+        'payment': [],
+        'side': side,
+        'size': '100',
+        'page': str(page),
+        'amount': '',
+        'authMaker': False,
+        'canTrade': False
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': random.choice(user_agents),
+        'Accept': 'application/json',
+        'Accept-Language': random.choice(accept_languages),
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Origin': 'https://www.bybit.com',
+        'Referer': random.choice(referers),
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site'
+    }
+    
+    try:
+        response = proxy_manager.make_request(
+            method='POST',
+            url=url,
+            json=payload,
+            headers=headers
+        )
+        
+        if response is None or response.status_code != 200:
+            return (page, [], False)
+        
+        response_data = response.json()
+        
+        if not isinstance(response_data, dict) or response_data.get('ret_code') != 0:
+            return (page, [], False)
+        
+        result = response_data.get('result', {})
+        if not isinstance(result, dict):
+            return (page, [], False)
+        
+        items = result.get('items', [])
+        if not isinstance(items, list):
+            return (page, [], False)
+        
+        return (page, items, True)
+        
+    except Exception as e:
+        logging.error(f'Error fetching page {page}: {e}')
+        return (page, [], False)
 
 def handler(event: dict, context) -> dict:
     '''
@@ -190,286 +255,173 @@ def handler(event: dict, context) -> dict:
         
         user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0'
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+        
+        accept_languages = [
+            'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+            'en-US,en;q=0.9',
+            'ru;q=0.9,en;q=0.8'
+        ]
+        
+        referers = [
+            'https://www.bybit.com/fiat/trade/otc/?actionType=1&token=USDT&fiat=RUB&paymentMethod=',
+            'https://www.bybit.com/fiat/trade/otc/?actionType=0&token=USDT&fiat=RUB&paymentMethod=',
+            'https://www.bybit.com/fiat/trade/otc/'
         ]
         
         all_offers = []
         page = 1
-        max_pages = 10
+        total_items = 0
         
-        while page <= max_pages:
-            payload = {
-                'userId': '',
-                'tokenId': 'USDT',
-                'currencyId': 'RUB',
-                'payment': [],
-                'side': side,
-                'size': '100',
-                'page': str(page),
-                'amount': '',
-                'authMaker': False,
-                'canTrade': False
-            }
-        
-            accept_languages = [
-                'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'ru-RU,ru;q=0.9,en;q=0.8',
-                'en-US,en;q=0.9,ru;q=0.8',
-                'ru;q=0.9,en-US;q=0.8,en;q=0.7'
-            ]
+        # Параллельная загрузка страниц батчами
+        while True:
+            batch_pages = list(range(page, page + PARALLEL_REQUESTS))
+            batch_results = []
             
-            referers = [
-                'https://www.bybit.com/fiat/trade/otc/',
-                'https://www.bybit.com/fiat/trade/otc/?actionType=1&token=USDT&fiat=RUB',
-                'https://www.bybit.com/en/trade/spot/BTC/USDT',
-                'https://www.bybit.com/'
-            ]
+            # Загружаем батч страниц параллельно
+            with ThreadPoolExecutor(max_workers=PARALLEL_REQUESTS) as executor:
+                futures = {
+                    executor.submit(fetch_page, p, side, url, user_agents, accept_languages, referers): p 
+                    for p in batch_pages
+                }
+                
+                for future in as_completed(futures):
+                    try:
+                        page_num, items, success = future.result()
+                        if success:
+                            batch_results.append((page_num, items))
+                    except Exception as e:
+                        logging.error(f'Error in parallel fetch: {e}')
             
-            headers = {
-                'Content-Type': 'application/json',
-                'User-Agent': random.choice(user_agents),
-                'Accept': 'application/json',
-                'Accept-Language': random.choice(accept_languages),
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Origin': 'https://www.bybit.com',
-                'Referer': random.choice(referers),
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-site'
-            }
+            # Сортируем результаты по номеру страницы
+            batch_results.sort(key=lambda x: x[0])
             
-            # Используем прокси-менеджер для выполнения запроса
-            response = proxy_manager.make_request(
-                method='POST',
-                url=url,
-                json=payload,
-                headers=headers
-            )
-            
-            # Если запрос не удался - прерываем пагинацию
-            if response is None:
-                break
-            
-            # Обработка rate limit (429)
-            if response.status_code == 429:
-                time.sleep(random.uniform(2, 5))
-                continue
-            
-            # Если не 200 - прерываем
-            if response.status_code != 200:
-                break
-            
-            response_data = response.json()
-            
-            if not isinstance(response_data, dict) or response_data.get('ret_code') != 0:
-                break
-            
-            result = response_data.get('result', {})
-            if not isinstance(result, dict):
-                break
-            
-            items = result.get('items', [])
-            if not isinstance(items, list) or len(items) == 0:
-                break
-            
-            if debug and page == 1 and len(items) > 0:
-                debug_items = []
-                for item in items[:3]:
-                    debug_item = {
-                        'nickName': item.get('nickName'),
-                        'payments': item.get('payments', []),
-                        'paymentMethods': item.get('paymentMethods', []),
-                        'payment': item.get('payment', []),
-                        'all_keys': list(item.keys())
+            # Проверяем на пустую страницу и обрабатываем результаты
+            has_empty_page = False
+            for page_num, items in batch_results:
+                if not items:
+                    has_empty_page = True
+                    break
+                
+                # Обрабатываем каждый item со страницы
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    
+                    # Извлекаем данные о трейдере
+                    nick_name = item.get('nickName', '')
+                    user_id = item.get('userId', '')
+                    
+                    # Фильтрация по search_user
+                    if search_user:
+                        if search_user.lower() not in nick_name.lower():
+                            continue
+                    
+                    # Методы оплаты
+                    payments_raw = item.get('payments', [])
+                    payment_methods = []
+                    for p in payments_raw:
+                        if isinstance(p, dict):
+                            payment_id = str(p.get('id', ''))
+                            payment_name = PAYMENT_METHOD_MAP.get(payment_id, p.get('paymentType', 'Unknown'))
+                            payment_methods.append(payment_name)
+                    
+                    # Тип мерчанта
+                    merchant_type = 'Verified' if item.get('authMaker') else 'Regular'
+                    
+                    # Процент выполненных заказов
+                    finish_rate = item.get('finishRate', '0')
+                    try:
+                        finish_rate_float = float(finish_rate)
+                        finish_rate_percent = f"{finish_rate_float * 100:.2f}%"
+                    except:
+                        finish_rate_percent = finish_rate
+                    
+                    # Ограничения по сумме
+                    min_amount = item.get('minAmount', '')
+                    max_amount = item.get('maxAmount', '')
+                    
+                    # Доступное количество и цена
+                    last_quantity = item.get('lastQuantity', '')
+                    price = item.get('price', '')
+                    
+                    # Формируем объект оффера
+                    offer = {
+                        'id': f"{user_id}_{item.get('id', '')}",
+                        'merchant': {
+                            'name': nick_name,
+                            'id': user_id,
+                            'type': merchant_type,
+                            'orders_completed': item.get('recentOrderNum', 0),
+                            'completion_rate': finish_rate_percent,
+                            'register_time_days': item.get('registerTimeDays', 0)
+                        },
+                        'price': price,
+                        'available': last_quantity,
+                        'limits': {
+                            'min': min_amount,
+                            'max': max_amount
+                        },
+                        'payment_methods': payment_methods,
+                        'payment_time_limit': item.get('paymentLimitTime', 15)
                     }
-                    debug_items.append(debug_item)
-                debug_info = {
-                    'debug': True,
-                    'items': debug_items
-                }
-                return {
-                    'statusCode': 200,
-                    'headers': {
-                        'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
-                    },
-                    'body': json.dumps(debug_info, ensure_ascii=False, indent=2),
-                    'isBase64Encoded': False
-                }
+                    
+                    all_offers.append(offer)
+                    total_items += 1
             
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                
-                payments = item.get('payments', [])
-                if not isinstance(payments, list):
-                    payments = []
-                
-                payment_methods = []
-                for payment_id in payments:
-                    # Payments - это массив ID (строк), например ["14", "40"]
-                    if isinstance(payment_id, str):
-                        payment_name = PAYMENT_METHOD_MAP.get(payment_id, f'Payment #{payment_id}')
-                        payment_methods.append(payment_name)
-                
-                min_amt = float(item.get('minAmount', 0))
-                max_amt = float(item.get('maxAmount', 0))
-                is_triangle = abs(max_amt - min_amt) <= 1.0
-                
-                # Онлайн статус - используем isOnline
-                is_online = bool(item.get('isOnline', False))
-                last_logout_time = item.get('lastLogoutTime', '')
-                
-                # Определяем тип мерчанта по Verified Advertiser тегам
-                # BA = Block Advertiser (блочный мерчант - высший статус)
-                # VA3 = Gold Verified Advertiser
-                # VA2 = Silver Verified Advertiser
-                # VA1/VA = Bronze Verified Advertiser
-                auth_tags = item.get('authTag', [])
-                if not isinstance(auth_tags, list):
-                    auth_tags = []
-                
-                merchant_type = None
-                merchant_badge = None
-                is_merchant = False
-                is_block_trade = 'BA' in auth_tags
-                
-                # Определяем уровень VA (Verified Advertiser)
-                if 'VA3' in auth_tags:
-                    merchant_type = 'gold'
-                    merchant_badge = 'vaGoldIcon'
-                    is_merchant = True
-                elif 'VA2' in auth_tags:
-                    merchant_type = 'silver'
-                    merchant_badge = 'vaSilverIcon'
-                    is_merchant = True
-                elif 'VA1' in auth_tags or 'VA' in auth_tags:
-                    merchant_type = 'bronze'
-                    merchant_badge = 'vaBronzeIcon'
-                    is_merchant = True
-                
-                offer = {
-                    'id': str(item.get('id', '')),
-                    'price': float(item.get('price', 0)),
-                    'maker': str(item.get('nickName', 'Unknown')),
-                    'maker_id': str(item.get('userId', '')),
-                    'quantity': float(item.get('lastQuantity', 0)),
-                    'min_amount': min_amt,
-                    'max_amount': max_amt,
-                    'payment_methods': payment_methods,
-                    'side': 'sell' if side == '1' else 'buy',
-                    'completion_rate': int(item.get('recentOrderNum', 0)),
-                    'total_orders': int(item.get('recentExecuteRate', 0)),
-                    'is_merchant': is_merchant,
-                    'merchant_type': merchant_type,
-                    'merchant_badge': merchant_badge,
-                    'is_block_trade': is_block_trade,
-                    'is_online': is_online,
-                    'is_triangle': is_triangle,
-                    'last_logout_time': last_logout_time,
-                    'auth_tags': auth_tags
-                }
-                all_offers.append(offer)
-            
-            if len(items) < 100:
+            # Если встретили пустую страницу, прекращаем загрузку
+            if has_empty_page:
                 break
             
-            # Задержка между запросами из конфига
-            time.sleep(random.uniform(*REQUEST_DELAY_RANGE))
-            page += 1
+            # Переходим к следующему батчу
+            page += PARALLEL_REQUESTS
         
-        if search_user:
-            found_users = [o for o in all_offers if search_user.lower() in o['maker'].lower()]
-            result_data = {
-                'search': search_user,
-                'found': len(found_users),
-                'users': found_users
-            }
-        else:
-            result_data = {
-                'offers': all_offers,
-                'total': len(all_offers),
-                'side': 'sell' if side == '1' else 'buy',
-                'pages_loaded': page - 1,
-                'proxy_stats': proxy_manager.get_stats()  # Статистика прокси
-            }
+        # Сохраняем в БД
+        try:
+            db_manager.save_offers(side, all_offers)
+            logging.info(f'Successfully saved {len(all_offers)} offers to database')
+        except Exception as e:
+            logging.error(f'Error saving to database: {e}')
         
-        # Сохраняем в базу данных (только для основных запросов, не поиска)
-        if not search_user:
-            try:
-                # Преобразуем данные для БД
-                offers_for_db = []
-                for offer in all_offers:
-                    offers_for_db.append({
-                        'id': offer['id'],
-                        'price': offer['price'],
-                        'min_amount': offer['min_amount'],
-                        'max_amount': offer['max_amount'],
-                        'available_amount': offer['quantity'],
-                        'nickname': offer['maker'],
-                        'is_merchant': offer['is_merchant'],
-                        'merchant_type': offer['merchant_type'],
-                        'is_online': offer['is_online'],
-                        'is_triangle': offer['is_triangle'],
-                        'completion_rate': offer['completion_rate'],
-                        'completed_orders': offer['total_orders'],
-                        'payment_methods': offer['payment_methods']
-                    })
-                
-                db_manager.save_offers(offers_for_db, side)
-                logging.info(f'Successfully saved {len(offers_for_db)} offers to database for side {side}')
-            except Exception as e:
-                logging.error(f'Failed to save to database: {e}')
-            
-            cache[cache_key] = (result_data, datetime.now())
-        
-        headers_dict = {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'X-Cache': 'MISS',
-            'X-Saved-To-DB': 'true' if not search_user else 'false'
+        # Обновляем кеш
+        cache[cache_key] = {
+            'data': all_offers,
+            'timestamp': now
         }
         
-        # Добавляем статистику прокси в заголовки для мониторинга
-        stats = proxy_manager.get_stats()
-        if stats['total_requests'] > 0:
-            headers_dict['X-Proxy-Success-Rate'] = f"{stats.get('success_rate', 0):.1f}%"
-            headers_dict['X-Proxy-Usage'] = f"{stats.get('proxy_usage_rate', 0):.1f}%"
+        proxy_stats = proxy_manager.get_stats()
+        
+        response_data = {
+            'offers': all_offers,
+            'total': len(all_offers),
+            'side': 'sell' if side == '1' else 'buy',
+            'from_cache': False,
+            'timestamp': now.isoformat(),
+            'auto_update_enabled': auto_update_enabled,
+            'proxy_stats': proxy_stats if debug else {}
+        }
         
         return {
             'statusCode': 200,
-            'headers': headers_dict,
-            'body': json.dumps(result_data),
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'X-Cache': 'MISS'
+            },
+            'body': json.dumps(response_data),
             'isBase64Encoded': False
         }
         
-    except requests.exceptions.Timeout:
-        return {
-            'statusCode': 504,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({'error': 'Request timeout'}),
-            'isBase64Encoded': False
-        }
     except Exception as e:
+        logging.error(f'Critical error in handler: {e}')
         return {
             'statusCode': 500,
             'headers': {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
             },
-            'body': json.dumps({'error': str(e)}),
+            'body': json.dumps({'error': f'Internal server error: {str(e)}'}),
             'isBase64Encoded': False
         }
