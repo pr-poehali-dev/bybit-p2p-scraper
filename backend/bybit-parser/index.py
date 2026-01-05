@@ -201,6 +201,7 @@ def handler(event: dict, context) -> dict:
     debug = params.get('debug') == 'true'
     search_user = params.get('search', '').strip()
     check_status = params.get('status') == 'true'
+    force_update = params.get('force') == 'true'
     
     try:
         # Проверяем глобальный статус автообновления (с кешированием)
@@ -281,16 +282,44 @@ def handler(event: dict, context) -> dict:
         
         # Проверяем, нужно ли обновлять данные (проверяем возраст БД в секундах)
         try:
-            should_fetch = auto_update_enabled and db_manager.should_update_seconds(side, UPDATE_INTERVAL_SECONDS)
+            should_fetch = force_update or (auto_update_enabled and db_manager.should_update_seconds(side, UPDATE_INTERVAL_SECONDS))
         except Exception as e:
             logging.error(f'Error checking should_update: {e}')
-            should_fetch = False
+            should_fetch = force_update  # Если force=true, всё равно обновляем
         
         if not should_fetch:
             # Возвращаем данные из базы
             try:
                 offers = db_manager.get_offers(side)
                 last_update = db_manager.get_last_update(side)
+                
+                # Сохраняем в память
+                db_cache[cache_key]['data'] = {
+                    'offers': offers,
+                    'total': len(offers),
+                    'side': 'sell' if side == '1' else 'buy'
+                }
+                db_cache[cache_key]['timestamp'] = now_ts
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*',
+                        'X-Cache': 'DB-HIT',
+                        'X-Last-Update': last_update.isoformat() if last_update else ''
+                    },
+                    'body': json.dumps({
+                        'offers': offers,
+                        'total': len(offers),
+                        'side': 'sell' if side == '1' else 'buy',
+                        'from_cache': True,
+                        'last_update': last_update.isoformat() if last_update else None,
+                        'auto_update_enabled': auto_update_enabled,
+                        'proxy_stats': {}
+                    }),
+                    'isBase64Encoded': False
+                }
             except Exception as e:
                 logging.error(f'[DB-ERROR] Failed to read from DB: {e}')
                 
@@ -322,34 +351,6 @@ def handler(event: dict, context) -> dict:
                 # Нет кеша вообще - загружаем с Bybit
                 logging.warning(f'[NO-CACHE] No cache available, fetching from Bybit')
                 # Продолжаем выполнение - загрузим с Bybit ниже
-            
-            # Сохраняем в память
-            db_cache[cache_key]['data'] = {
-                'offers': offers,
-                'total': len(offers),
-                'side': 'sell' if side == '1' else 'buy'
-            }
-            db_cache[cache_key]['timestamp'] = now_ts
-            
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                    'X-Cache': 'DB-HIT',
-                    'X-Last-Update': last_update.isoformat() if last_update else ''
-                },
-                'body': json.dumps({
-                    'offers': offers,
-                    'total': len(offers),
-                    'side': 'sell' if side == '1' else 'buy',
-                    'from_cache': True,
-                    'last_update': last_update.isoformat() if last_update else None,
-                    'auto_update_enabled': auto_update_enabled,
-                    'proxy_stats': {}
-                }),
-                'isBase64Encoded': False
-            }
     except Exception as e:
         logging.error(f'Error reading from database: {e}')
         # При ошибке БД продолжаем обычную загрузку

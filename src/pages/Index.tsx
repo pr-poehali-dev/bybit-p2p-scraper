@@ -118,14 +118,33 @@ const Index = () => {
     }
   };
 
-  const loadAllOffers = async () => {
+  const loadAllOffers = async (forceUpdate = false) => {
     setIsLoading(true);
     setNextUpdateIn(8);
     try {
+      const forceSuffix = forceUpdate ? '&force=true' : '';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
       await Promise.all([
-        fetchOffers('1', false),
-        fetchOffers('0', false)
+        fetch(`${API_URL}?side=1${forceSuffix}`, { signal: controller.signal }).then(r => r.json()).then(data => {
+          if (data.offers) setSellOffers(data.offers);
+          if (typeof data.auto_update_enabled === 'boolean') setGlobalAutoUpdateEnabled(data.auto_update_enabled);
+        }),
+        fetch(`${API_URL}?side=0${forceSuffix}`, { signal: controller.signal }).then(r => r.json()).then(data => {
+          if (data.offers) setBuyOffers(data.offers);
+        })
       ]);
+      
+      clearTimeout(timeoutId);
+      setLastUpdate(new Date());
+      
+      if (forceUpdate) {
+        toast({ title: 'Принудительное обновление', description: 'Данные загружены напрямую с Bybit' });
+      }
+    } catch (error) {
+      console.error('Failed to load offers:', error);
+      toast({ title: 'Ошибка', description: 'Не удалось загрузить данные', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -352,15 +371,26 @@ const Index = () => {
                 {globalAutoUpdateEnabled ? 'Стакан ВКЛ' : 'Стакан ВЫКЛ'}
               </Button>
               <Button 
-                onClick={() => loadAllOffers()}
+                onClick={() => loadAllOffers(false)}
                 disabled={isLoading}
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs"
-                title="Обновить данные из БД (БД автоматически обновляется каждые 90 сек)"
+                title="Обновить данные из БД"
               >
                 <Icon name="RefreshCw" size={12} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
                 Обновить
+              </Button>
+              <Button 
+                onClick={() => loadAllOffers(true)}
+                disabled={isLoading}
+                variant="secondary"
+                size="sm"
+                className="h-7 text-xs"
+                title="Принудительная загрузка с Bybit (игнорирует кеш БД)"
+              >
+                <Icon name="Zap" size={12} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                Форс
               </Button>
             </div>
           </div>
