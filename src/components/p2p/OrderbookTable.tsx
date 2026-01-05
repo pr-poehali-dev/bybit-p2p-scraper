@@ -2,7 +2,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import { P2POffer, PriceChange } from './types';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
-import { memo, useMemo } from 'react';
 
 interface OrderbookTableProps {
   title: string;
@@ -15,13 +14,12 @@ interface OrderbookTableProps {
   allOffersEmpty: boolean;
 }
 
-const OfferRow = memo(({ offer, idx, icon, textClass, priceChanges, getPriceChangeClass, HIGHLIGHTED_IDS, RED_HIGHLIGHTED_IDS }: any) => {
+const OfferRow = ({ offer, idx, icon, textClass, priceChanges, getPriceChangeClass, HIGHLIGHTED_IDS, RED_HIGHLIGHTED_IDS }: any) => {
   const isHighlighted = HIGHLIGHTED_IDS.includes(offer.maker_id);
   const isRedHighlighted = RED_HIGHLIGHTED_IDS.includes(offer.maker_id);
   
   return (
     <tr
-      key={offer.id} 
       style={{
         backgroundColor: isHighlighted 
           ? '#FFD70050'
@@ -90,11 +88,9 @@ const OfferRow = memo(({ offer, idx, icon, textClass, priceChanges, getPriceChan
       </td>
     </tr>
   );
-});
+};
 
-OfferRow.displayName = 'OfferRow';
-
-export const OrderbookTable = memo(({
+export const OrderbookTable = ({
   title,
   icon,
   iconClass,
@@ -174,6 +170,4 @@ export const OrderbookTable = memo(({
       </CardContent>
     </Card>
   );
-});
-
-OrderbookTable.displayName = 'OrderbookTable';
+};
