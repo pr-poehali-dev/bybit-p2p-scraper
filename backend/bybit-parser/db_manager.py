@@ -63,20 +63,35 @@ class DatabaseManager:
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
-                # Удаляем старые данные для этой стороны
+                # Удаляем старые данные для этой стороны (атомарно)
                 cur.execute(f"DELETE FROM {self.schema}.p2p_offers WHERE side = %s", (side,))
                 
-                # Вставляем новые данные
-                insert_query = f"""
+                # Используем UPSERT для предотвращения race condition
+                upsert_query = f"""
                     INSERT INTO {self.schema}.p2p_offers 
                     (id, side, price, min_amount, max_amount, available_amount, 
                      nickname, is_merchant, merchant_type, is_online, is_triangle,
                      completion_rate, completed_orders, payment_methods, updated_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (id, side) 
+                    DO UPDATE SET 
+                        price = EXCLUDED.price,
+                        min_amount = EXCLUDED.min_amount,
+                        max_amount = EXCLUDED.max_amount,
+                        available_amount = EXCLUDED.available_amount,
+                        nickname = EXCLUDED.nickname,
+                        is_merchant = EXCLUDED.is_merchant,
+                        merchant_type = EXCLUDED.merchant_type,
+                        is_online = EXCLUDED.is_online,
+                        is_triangle = EXCLUDED.is_triangle,
+                        completion_rate = EXCLUDED.completion_rate,
+                        completed_orders = EXCLUDED.completed_orders,
+                        payment_methods = EXCLUDED.payment_methods,
+                        updated_at = EXCLUDED.updated_at
                 """
                 
                 for offer in offers:
-                    cur.execute(insert_query, (
+                    cur.execute(upsert_query, (
                         offer['id'],
                         side,
                         offer['price'],
