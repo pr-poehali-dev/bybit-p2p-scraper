@@ -202,6 +202,7 @@ def handler(event: dict, context) -> dict:
     search_user = params.get('search', '').strip()
     check_status = params.get('status') == 'true'
     force_update = params.get('force') == 'true'
+    limit = params.get('limit')  # 'quick' = только 200, 'full' = все
     
     try:
         # Проверяем глобальный статус автообновления (с кешированием)
@@ -383,8 +384,16 @@ def handler(event: dict, context) -> dict:
         page = 1
         total_items = 0
         start_time = time.time()
-        MAX_PAGES = 8  # Максимум 8 страниц = 800 офферов (защита от зависания)
-        TIMEOUT_SECONDS = 15  # Общий таймаут на загрузку всех страниц (остаётся запас на сохранение в БД)
+        
+        # Если limit=quick, загружаем только 2 страницы (200 офферов)
+        if limit == 'quick':
+            MAX_PAGES = 2  # Только топ-200 для быстрого ответа
+            TIMEOUT_SECONDS = 5  # Быстрый таймаут
+            logging.info(f'[QUICK MODE] Loading only top 200 offers for side {side}')
+        else:
+            MAX_PAGES = 8  # Максимум 8 страниц = 800 офферов
+            TIMEOUT_SECONDS = 15  # Общий таймаут на загрузку всех страниц
+            logging.info(f'[FULL MODE] Loading up to {MAX_PAGES * 100} offers for side {side}')
         
         # Параллельная загрузка страниц батчами
         while True:
