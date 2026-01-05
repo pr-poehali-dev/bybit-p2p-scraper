@@ -16,7 +16,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(600);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(300);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
@@ -122,7 +122,7 @@ const Index = () => {
 
   const loadAllOffers = async (force = false) => {
     setIsLoading(true);
-    setNextUpdateIn(600);
+    setNextUpdateIn(300);
     try {
       await Promise.all([
         fetchOffers('1', false, force),
@@ -138,7 +138,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 600);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 300);
     }, 1000);
     
     return () => {
@@ -149,10 +149,10 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // Автообновление каждые 10 минут
+    // Автообновление каждые 5 минут
     const intervalId = setInterval(() => {
-      loadAllOffers();
-    }, 10 * 60 * 1000);
+      loadAllOffers(true);
+    }, 5 * 60 * 1000);
     
     return () => {
       clearInterval(intervalId);
@@ -248,30 +248,18 @@ const Index = () => {
               </div>
             )}
             <Button 
-              onClick={() => loadAllOffers(true)}
+              onClick={() => loadAllOffers(false)}
               disabled={isLoading}
               variant="outline"
               size="sm"
               className="h-7 text-xs"
-              title="Принудительно загрузить свежие данные с Bybit"
+              title="Обновить данные (из БД или Bybit если БД старше 1 минуты)"
             >
               <Icon name="RefreshCw" size={12} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               Обновить
             </Button>
           </div>
         </div>
-
-        <StatisticsCards
-          avgPrice={avgPrice}
-          totalOffers={currentOffers.length}
-          merchantCount={merchantCount}
-          goldCount={goldCount}
-          silverCount={silverCount}
-          bronzeCount={bronzeCount}
-          blockTradeCount={blockTradeCount}
-          onlineCount={onlineCount}
-          triangleCount={triangleCount}
-        />
 
         <FiltersPanel
           onlyMerchants={onlyMerchants}

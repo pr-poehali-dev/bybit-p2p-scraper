@@ -40,7 +40,7 @@ proxy_manager = ProxyManager(
 # Инициализация менеджера базы данных
 db_manager = DatabaseManager()
 
-UPDATE_INTERVAL_MINUTES = 10
+UPDATE_INTERVAL_MINUTES = 1
 
 def handler(event: dict, context) -> dict:
     '''
@@ -81,8 +81,8 @@ def handler(event: dict, context) -> dict:
     force_update = params.get('force') == 'true'
     
     try:
-        # Проверяем, нужно ли обновлять данные
-        should_fetch = force_update or db_manager.should_update(side, UPDATE_INTERVAL_MINUTES)
+        # Проверяем, нужно ли обновлять данные (если не force, то проверяем возраст БД)
+        should_fetch = db_manager.should_update(side, UPDATE_INTERVAL_MINUTES)
         
         if not should_fetch:
             # Возвращаем данные из базы
