@@ -231,7 +231,7 @@ const Index = () => {
                 <button
                   onClick={() => setAutoUpdateEnabled(!autoUpdateEnabled)}
                   className="flex items-center gap-1 text-[9px] opacity-70 hover:opacity-100 transition-opacity"
-                  title={автообновление ${autoUpdateEnabled ? 'вкл' : 'выкл'}}
+                  title={`Автообновление ${autoUpdateEnabled ? 'вкл' : 'выкл'}`}
                 >
                   <Icon name={autoUpdateEnabled ? "Timer" : "TimerOff"} size={10} />
                   {autoUpdateEnabled ? (
