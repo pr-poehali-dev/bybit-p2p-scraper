@@ -26,6 +26,8 @@ export const OrderbookTable = ({
 }: OrderbookTableProps) => {
   const bgClass = icon === 'TrendingDown' ? 'bg-sell' : 'bg-buy';
   const textClass = icon === 'TrendingDown' ? 'text-sell' : 'text-buy';
+  
+  const HIGHLIGHTED_IDS = ['63237391', '489860200', '487500299'];
 
   return (
     <Card className="border-border bg-card">
@@ -53,15 +55,19 @@ export const OrderbookTable = ({
                 </tr>
               </thead>
               <tbody>
-                {offers.map((offer, idx) => (
+                {offers.map((offer, idx) => {
+                  const isHighlighted = HIGHLIGHTED_IDS.includes(offer.maker_id);
+                  return (
                   <tr 
                     key={offer.id} 
                     style={{
-                      backgroundColor: offer.is_online 
-                        ? (icon === 'TrendingDown' ? '#E9967A33' : '#00FF0033')
-                        : (icon === 'TrendingDown' ? '#E9967A11' : '#00FF0011')
+                      backgroundColor: isHighlighted 
+                        ? '#FFD70050'
+                        : offer.is_online 
+                          ? (icon === 'TrendingDown' ? '#E9967A33' : '#00FF0033')
+                          : (icon === 'TrendingDown' ? '#E9967A11' : '#00FF0011')
                     }}
-                    className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} hover:bg-secondary/30 transition-all duration-300 ${getPriceChangeClass(offer.id)}`}
+                    className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} ${isHighlighted ? 'border-l-4 border-l-yellow-500' : ''} hover:bg-secondary/30 transition-all duration-300 ${getPriceChangeClass(offer.id)}`}
                   >
                     <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
                     <td className={`py-0 px-1 font-bold ${textClass}`}>
@@ -129,7 +135,8 @@ export const OrderbookTable = ({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {offers.length === 0 && !isLoading && (
