@@ -36,7 +36,7 @@ db_cache = {
     'buy': {'data': None, 'timestamp': None},
     'auto_update_enabled': {'value': True, 'timestamp': None}
 }
-DB_CACHE_TTL_SECONDS = 3  # Кеш БД на 3 секунды (более свежие данные)
+DB_CACHE_TTL_SECONDS = 15  # Кеш БД на 15 секунд (снижает нагрузку на PostgreSQL)
 
 # Инициализация глобального прокси-менеджера
 proxy_manager = ProxyManager(
@@ -246,29 +246,38 @@ def handler(event: dict, context) -> dict:
         cache_key = 'sell' if side == '1' else 'buy'
         cached = db_cache[cache_key]
         
-        if (cached['data'] is not None and cached['timestamp'] is not None and
-            (now_ts - cached['timestamp']).total_seconds() < DB_CACHE_TTL_SECONDS):
-            # Возвращаем из памяти (без обращения к БД)
-            logging.info(f'Returning from memory cache for side {side}')
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                    'X-Cache': 'MEMORY-HIT',
-                    'X-Last-Update': cached['timestamp'].isoformat()
-                },
-                'body': json.dumps({
-                    'offers': cached['data']['offers'],
-                    'total': cached['data']['total'],
-                    'side': cached['data']['side'],
-                    'from_cache': True,
-                    'last_update': cached['timestamp'].isoformat(),
-                    'auto_update_enabled': auto_update_enabled,
-                    'proxy_stats': {}
-                }),
-                'isBase64Encoded': False
-            }
+        # ВСЕГДА используем memory cache если он есть (даже если устарел)
+        # Это снижает нагрузку на PostgreSQL
+        if cached['data'] is not None and cached['timestamp'] is not None:
+            cache_age = (now_ts - cached['timestamp']).total_seconds()
+            
+            # Если кеш свежий - возвращаем немедленно
+            if cache_age < DB_CACHE_TTL_SECONDS:
+                logging.info(f'[MEMORY-HIT] Fresh cache for side {side}, age: {cache_age:.1f}s')
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*',
+                        'X-Cache': 'MEMORY-HIT',
+                        'X-Cache-Age': str(int(cache_age))
+                    },
+                    'body': json.dumps({
+                        'offers': cached['data']['offers'],
+                        'total': cached['data']['total'],
+                        'side': cached['data']['side'],
+                        'from_cache': True,
+                        'cache_age': int(cache_age),
+                        'auto_update_enabled': auto_update_enabled,
+                        'proxy_stats': {}
+                    }),
+                    'isBase64Encoded': False
+                }
+            else:
+                # Кеш устарел, но используем его если БД недоступна
+                logging.info(f'[STALE-CACHE] Cache expired ({cache_age:.1f}s), trying DB...')
+        else:
+            logging.info(f'[NO-CACHE] No memory cache, need to fetch from DB')
         
         # Проверяем, нужно ли обновлять данные (проверяем возраст БД в секундах)
         try:
@@ -283,8 +292,35 @@ def handler(event: dict, context) -> dict:
                 offers = db_manager.get_offers(side)
                 last_update = db_manager.get_last_update(side)
             except Exception as e:
-                logging.error(f'Error reading offers from DB: {e}')
-                # Возвращаем пустой результат
+                logging.error(f'[DB-ERROR] Failed to read from DB: {e}')
+                
+                # ВАЖНО: Если есть устаревший кеш - используем его вместо пустого ответа
+                if cached['data'] is not None:
+                    cache_age = (now_ts - cached['timestamp']).total_seconds()
+                    logging.warning(f'[FALLBACK] Using stale cache ({cache_age:.0f}s old) due to DB error')
+                    return {
+                        'statusCode': 200,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*',
+                            'X-Cache': 'STALE-FALLBACK',
+                            'X-Cache-Age': str(int(cache_age))
+                        },
+                        'body': json.dumps({
+                            'offers': cached['data']['offers'],
+                            'total': cached['data']['total'],
+                            'side': cached['data']['side'],
+                            'from_cache': True,
+                            'cache_age': int(cache_age),
+                            'warning': 'Using cached data due to DB unavailability',
+                            'auto_update_enabled': auto_update_enabled,
+                            'proxy_stats': {}
+                        }),
+                        'isBase64Encoded': False
+                    }
+                
+                # Нет кеша вообще - возвращаем пустой результат
+                logging.error(f'[CRITICAL] No cache available, returning empty')
                 return {
                     'statusCode': 200,
                     'headers': {

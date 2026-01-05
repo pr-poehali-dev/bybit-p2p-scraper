@@ -6,7 +6,6 @@ import { P2POffer, PriceChange } from '@/components/p2p/types';
 import { StatisticsCards } from '@/components/p2p/StatisticsCards';
 import { FiltersPanel } from '@/components/p2p/FiltersPanel';
 import { OrderbookTable } from '@/components/p2p/OrderbookTable';
-import { StatsPanel } from '@/components/p2p/StatsPanel';
 
 const API_URL = 'https://functions.poehali.dev/ea8079f5-9a7d-41e0-9530-698a124a62b8';
 
@@ -21,7 +20,6 @@ const Index = () => {
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
-  const [backendInterval, setBackendInterval] = useState<number>(25);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -157,9 +155,6 @@ const Index = () => {
       const data = await response.json();
       if (typeof data.auto_update_enabled === 'boolean') {
         setGlobalAutoUpdateEnabled(data.auto_update_enabled);
-      }
-      if (typeof data.update_interval_seconds === 'number') {
-        setBackendInterval(data.update_interval_seconds);
       }
     } catch (error) {
       console.error('Failed to check status:', error);
@@ -377,12 +372,6 @@ const Index = () => {
             </p>
           </div>
         )}
-
-        <StatsPanel 
-          frontendIntervalSeconds={8}
-          backendIntervalSeconds={backendInterval}
-          autoUpdateEnabled={globalAutoUpdateEnabled}
-        />
 
         <FiltersPanel
           onlyMerchants={onlyMerchants}
