@@ -15,7 +15,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(8);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(19);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
@@ -120,7 +120,7 @@ const Index = () => {
 
   const loadAllOffers = async (forceUpdate = false) => {
     setIsLoading(true);
-    setNextUpdateIn(25);
+    setNextUpdateIn(19);
     
     try {
       const forceSuffix = forceUpdate ? '&force=true' : '';
@@ -178,21 +178,24 @@ const Index = () => {
       if (data.last_update_sell && data.last_update_sell !== lastDbUpdateSell) {
         console.log('📊 Sell side updated:', data.last_update_sell);
         setLastDbUpdateSell(data.last_update_sell);
-        if (lastDbUpdateSell !== null) needsUpdate = true; // Только если это не первая проверка
+        if (lastDbUpdateSell !== null) needsUpdate = true;
       }
       
       if (data.last_update_buy && data.last_update_buy !== lastDbUpdateBuy) {
         console.log('📊 Buy side updated:', data.last_update_buy);
         setLastDbUpdateBuy(data.last_update_buy);
-        if (lastDbUpdateBuy !== null) needsUpdate = true; // Только если это не первая проверка
+        if (lastDbUpdateBuy !== null) needsUpdate = true;
       }
       
-      // Если БД обновилась - загружаем новые данные (но не при первой загрузке)
-      if (needsUpdate && !skipDataLoad) {
-        console.log('🔄 DB changed! Loading fresh data from database...');
+      // ИСПРАВЛЕНИЕ: всегда загружаем данные (триггерим проверку бэкенда)
+      // Бэкенд сам решит: обновить с Bybit или вернуть кеш
+      if (!skipDataLoad) {
+        if (needsUpdate) {
+          console.log('🔄 DB changed! Loading fresh data from database...');
+        } else {
+          console.log('🔄 Checking backend for updates...');
+        }
         await loadAllOffers();
-      } else if (!needsUpdate && !skipDataLoad) {
-        console.log('✅ DB unchanged, skipping data load (saving API calls)');
       }
     } catch (error) {
       console.error('Failed to check status:', error);
@@ -241,7 +244,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 25);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 19);
     }, 1000);
     
     return () => {
@@ -252,11 +255,11 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 25 секунд (легкий запрос)
+    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 19 секунд (легкий запрос)
     // Данные грузим только если БД реально обновилась
     const intervalId = setInterval(() => {
       checkStatus(); // Легкий запрос - только проверка timestamp
-    }, 25 * 1000);
+    }, 19 * 1000);
     
     return () => {
       clearInterval(intervalId);
