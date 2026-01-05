@@ -150,7 +150,7 @@ export const OrderbookTable = memo(({
               <tbody>
                 {offers.map((offer, idx) => (
                   <OfferRow 
-                    key={`${offer.maker_id}-${offer.price}`}
+                    key={offer.id}
                     offer={offer}
                     idx={idx}
                     icon={icon}
