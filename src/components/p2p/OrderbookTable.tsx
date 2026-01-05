@@ -28,6 +28,19 @@ export const OrderbookTable = ({
   const textClass = icon === 'TrendingDown' ? 'text-sell' : 'text-buy';
   
   const HIGHLIGHTED_IDS = ['63237391', '489860200', '487500299'];
+  const RED_HIGHLIGHTED_IDS = [
+    '29037655', '30992920', '102582927', '102582892', '100619009', '46137629',
+    '106416385', '102584986', '63239208', '102598258', '170157152', '170370662',
+    '137171647', '170874755', '170807040', '125575532', '170305806', '145945716',
+    '144200384', '185780874', '185783507', '189690512', '189708162', '189699943',
+    '189711233', '189713682', '203225666', '157530252', '179792181', '189692878',
+    '197842422', '203230149', '203233821', '203238638', '203241198', '203247816',
+    '326130053', '214238898', '223167874', '223171723', '223175483', '223188445',
+    '203413604', '321771072', '322654967', '322655074', '322655026', '507240725',
+    '507241580', '326172897', '326210696', '326611735', '326653264', '328860452',
+    '328895105', '328979814', '469596487', '469605357', '480083646', '480084790',
+    '480085924'
+  ];
 
   return (
     <Card className="border-border bg-card">
@@ -57,17 +70,20 @@ export const OrderbookTable = ({
               <tbody>
                 {offers.map((offer, idx) => {
                   const isHighlighted = HIGHLIGHTED_IDS.includes(offer.maker_id);
+                  const isRedHighlighted = RED_HIGHLIGHTED_IDS.includes(offer.maker_id);
                   return (
                   <tr 
                     key={offer.id} 
                     style={{
                       backgroundColor: isHighlighted 
                         ? '#FFD70050'
-                        : offer.is_online 
-                          ? (icon === 'TrendingDown' ? '#E9967A33' : '#00FF0033')
-                          : (icon === 'TrendingDown' ? '#E9967A11' : '#00FF0011')
+                        : isRedHighlighted
+                          ? '#FF000020'
+                          : offer.is_online 
+                            ? (icon === 'TrendingDown' ? '#E9967A33' : '#00FF0033')
+                            : (icon === 'TrendingDown' ? '#E9967A11' : '#00FF0011')
                     }}
-                    className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} ${isHighlighted ? 'border-l-4 border-l-yellow-500' : ''} hover:bg-secondary/30 transition-all duration-300 ${getPriceChangeClass(offer.id)}`}
+                    className={`${(idx + 1) % 10 === 0 ? 'border-b border-border' : ''} ${isHighlighted ? 'border-l-4 border-l-yellow-500' : ''} ${isRedHighlighted ? 'border-l-4 border-l-red-500' : ''} hover:bg-secondary/30 transition-all duration-300 ${getPriceChangeClass(offer.id)}`}
                   >
                     <td className="py-0 px-1 text-muted-foreground text-[9px]">{idx + 1}</td>
                     <td className={`py-0 px-1 font-bold ${textClass}`}>
