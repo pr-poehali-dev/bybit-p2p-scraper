@@ -234,13 +234,8 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Первая загрузка данных + получение timestamps
-    const initData = async () => {
-      await checkStatus(true); // Получаем timestamps (без загрузки данных)
-      await loadAllOffers(); // Загружаем данные
-    };
-    
-    initData();
+    // Первая загрузка данных
+    loadAllOffers();
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
@@ -255,16 +250,16 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 10 секунд (легкий запрос)
-    // Данные грузим только если БД реально обновилась
+    // ОПТИМИЗАЦИЯ: Загружаем данные каждые 10 секунд напрямую
+    // Бэкенд сам проверит нужно ли парсить Bybit или вернуть кеш
     const intervalId = setInterval(() => {
-      checkStatus(); // Легкий запрос - только проверка timestamp
+      loadAllOffers(); // Прямая загрузка без лишнего checkStatus()
     }, 10 * 1000);
     
     return () => {
       clearInterval(intervalId);
     };
-  }, [autoUpdateEnabled, lastDbUpdateSell, lastDbUpdateBuy]);
+  }, [autoUpdateEnabled]);
 
   const filteredSellOffers = useMemo(() => {
     return sellOffers.filter(offer => {
