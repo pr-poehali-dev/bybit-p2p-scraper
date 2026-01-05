@@ -310,62 +310,70 @@ def handler(event: dict, context) -> dict:
                     if not isinstance(item, dict):
                         continue
                     
-                    # Извлекаем данные о трейдере
-                    nick_name = item.get('nickName', '')
-                    user_id = item.get('userId', '')
+                    # Методы оплаты (payments - это массив ID строк, например ["14", "40"])
+                    payments = item.get('payments', [])
+                    if not isinstance(payments, list):
+                        payments = []
                     
-                    # Фильтрация по search_user
-                    if search_user:
-                        if search_user.lower() not in nick_name.lower():
-                            continue
-                    
-                    # Методы оплаты
-                    payments_raw = item.get('payments', [])
                     payment_methods = []
-                    for p in payments_raw:
-                        if isinstance(p, dict):
-                            payment_id = str(p.get('id', ''))
-                            payment_name = PAYMENT_METHOD_MAP.get(payment_id, p.get('paymentType', 'Unknown'))
+                    for payment_id in payments:
+                        if isinstance(payment_id, str):
+                            payment_name = PAYMENT_METHOD_MAP.get(payment_id, f'Payment #{payment_id}')
                             payment_methods.append(payment_name)
                     
-                    # Тип мерчанта
-                    merchant_type = 'Verified' if item.get('authMaker') else 'Regular'
+                    # Лимиты
+                    min_amt = float(item.get('minAmount', 0))
+                    max_amt = float(item.get('maxAmount', 0))
+                    is_triangle = abs(max_amt - min_amt) <= 1.0
                     
-                    # Процент выполненных заказов
-                    finish_rate = item.get('finishRate', '0')
-                    try:
-                        finish_rate_float = float(finish_rate)
-                        finish_rate_percent = f"{finish_rate_float * 100:.2f}%"
-                    except:
-                        finish_rate_percent = finish_rate
+                    # Онлайн статус
+                    is_online = bool(item.get('isOnline', False))
+                    last_logout_time = item.get('lastLogoutTime', '')
                     
-                    # Ограничения по сумме
-                    min_amount = item.get('minAmount', '')
-                    max_amount = item.get('maxAmount', '')
+                    # Определяем тип мерчанта по Verified Advertiser тегам
+                    auth_tags = item.get('authTag', [])
+                    if not isinstance(auth_tags, list):
+                        auth_tags = []
                     
-                    # Доступное количество и цена
-                    last_quantity = item.get('lastQuantity', '')
-                    price = item.get('price', '')
+                    merchant_type = None
+                    merchant_badge = None
+                    is_merchant = False
+                    is_block_trade = 'BA' in auth_tags
                     
-                    # Формируем объект оффера
+                    if 'VA3' in auth_tags:
+                        merchant_type = 'gold'
+                        merchant_badge = 'vaGoldIcon'
+                        is_merchant = True
+                    elif 'VA2' in auth_tags:
+                        merchant_type = 'silver'
+                        merchant_badge = 'vaSilverIcon'
+                        is_merchant = True
+                    elif 'VA1' in auth_tags or 'VA' in auth_tags:
+                        merchant_type = 'bronze'
+                        merchant_badge = 'vaBronzeIcon'
+                        is_merchant = True
+                    
+                    # Формируем объект оффера (старый формат для совместимости с frontend)
                     offer = {
-                        'id': f"{user_id}_{item.get('id', '')}",
-                        'merchant': {
-                            'name': nick_name,
-                            'id': user_id,
-                            'type': merchant_type,
-                            'orders_completed': item.get('recentOrderNum', 0),
-                            'completion_rate': finish_rate_percent,
-                            'register_time_days': item.get('registerTimeDays', 0)
-                        },
-                        'price': price,
-                        'available': last_quantity,
-                        'limits': {
-                            'min': min_amount,
-                            'max': max_amount
-                        },
+                        'id': str(item.get('id', '')),
+                        'price': float(item.get('price', 0)),
+                        'maker': str(item.get('nickName', 'Unknown')),
+                        'maker_id': str(item.get('userId', '')),
+                        'quantity': float(item.get('lastQuantity', 0)),
+                        'min_amount': min_amt,
+                        'max_amount': max_amt,
                         'payment_methods': payment_methods,
-                        'payment_time_limit': item.get('paymentLimitTime', 15)
+                        'side': 'sell' if side == '1' else 'buy',
+                        'completion_rate': int(item.get('recentOrderNum', 0)),
+                        'total_orders': int(item.get('recentExecuteRate', 0)),
+                        'is_merchant': is_merchant,
+                        'merchant_type': merchant_type,
+                        'merchant_badge': merchant_badge,
+                        'is_block_trade': is_block_trade,
+                        'is_online': is_online,
+                        'is_triangle': is_triangle,
+                        'last_logout_time': last_logout_time,
+                        'auth_tags': auth_tags
                     }
                     
                     all_offers.append(offer)
@@ -378,12 +386,31 @@ def handler(event: dict, context) -> dict:
             # Переходим к следующему батчу
             page += PARALLEL_REQUESTS
         
-        # Сохраняем в БД
-        try:
-            db_manager.save_offers(side, all_offers)
-            logging.info(f'Successfully saved {len(all_offers)} offers to database')
-        except Exception as e:
-            logging.error(f'Error saving to database: {e}')
+        # Сохраняем в БД (преобразуем формат для БД)
+        if not search_user:
+            try:
+                offers_for_db = []
+                for offer in all_offers:
+                    offers_for_db.append({
+                        'id': offer['id'],
+                        'price': offer['price'],
+                        'min_amount': offer['min_amount'],
+                        'max_amount': offer['max_amount'],
+                        'available_amount': offer['quantity'],
+                        'nickname': offer['maker'],
+                        'is_merchant': offer['is_merchant'],
+                        'merchant_type': offer['merchant_type'],
+                        'is_online': offer['is_online'],
+                        'is_triangle': offer['is_triangle'],
+                        'completion_rate': offer['completion_rate'],
+                        'completed_orders': offer['total_orders'],
+                        'payment_methods': offer['payment_methods']
+                    })
+                
+                db_manager.save_offers(offers_for_db, side)
+                logging.info(f'Successfully saved {len(offers_for_db)} offers to database for side {side}')
+            except Exception as e:
+                logging.error(f'Failed to save to database: {e}')
         
         # Обновляем кеш
         cache[cache_key] = {
