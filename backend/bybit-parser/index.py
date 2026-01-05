@@ -30,6 +30,14 @@ logging.basicConfig(
 cache = {}
 CACHE_TTL = 8
 
+# In-memory кеш для данных из БД (снижает rate limit)
+db_cache = {
+    'sell': {'data': None, 'timestamp': None},
+    'buy': {'data': None, 'timestamp': None},
+    'auto_update_enabled': {'value': True, 'timestamp': None}
+}
+DB_CACHE_TTL_SECONDS = 5  # Кеш БД на 5 секунд
+
 # Инициализация глобального прокси-менеджера
 proxy_manager = ProxyManager(
     proxies_list=PROXIES,
@@ -195,13 +203,30 @@ def handler(event: dict, context) -> dict:
     check_status = params.get('status') == 'true'
     
     try:
-        # Проверяем глобальный статус автообновления
-        auto_update_enabled = db_manager.is_auto_update_enabled()
+        # Проверяем глобальный статус автообновления (с кешированием)
+        now_ts = datetime.now()
+        if (db_cache['auto_update_enabled']['timestamp'] is None or 
+            (now_ts - db_cache['auto_update_enabled']['timestamp']).total_seconds() > DB_CACHE_TTL_SECONDS):
+            try:
+                auto_update_enabled = db_manager.is_auto_update_enabled()
+                db_cache['auto_update_enabled']['value'] = auto_update_enabled
+                db_cache['auto_update_enabled']['timestamp'] = now_ts
+            except Exception as e:
+                logging.error(f'Error checking auto_update: {e}, using cached value')
+                auto_update_enabled = db_cache['auto_update_enabled']['value']
+        else:
+            auto_update_enabled = db_cache['auto_update_enabled']['value']
         
         # Если запрос только на проверку статуса
         if check_status:
-            last_update_sell = db_manager.get_last_update('1')
-            last_update_buy = db_manager.get_last_update('0')
+            try:
+                last_update_sell = db_manager.get_last_update('1')
+                last_update_buy = db_manager.get_last_update('0')
+            except Exception as e:
+                logging.error(f'Error getting last updates: {e}')
+                last_update_sell = None
+                last_update_buy = None
+            
             return {
                 'statusCode': 200,
                 'headers': {
@@ -216,13 +241,75 @@ def handler(event: dict, context) -> dict:
                 'isBase64Encoded': False
             }
         
+        # Проверяем кеш данных для этой стороны
+        cache_key = 'sell' if side == '1' else 'buy'
+        cached = db_cache[cache_key]
+        
+        if (cached['data'] is not None and cached['timestamp'] is not None and
+            (now_ts - cached['timestamp']).total_seconds() < DB_CACHE_TTL_SECONDS):
+            # Возвращаем из памяти (без обращения к БД)
+            logging.info(f'Returning from memory cache for side {side}')
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'X-Cache': 'MEMORY-HIT',
+                    'X-Last-Update': cached['timestamp'].isoformat()
+                },
+                'body': json.dumps({
+                    'offers': cached['data']['offers'],
+                    'total': cached['data']['total'],
+                    'side': cached['data']['side'],
+                    'from_cache': True,
+                    'last_update': cached['timestamp'].isoformat(),
+                    'auto_update_enabled': auto_update_enabled,
+                    'proxy_stats': {}
+                }),
+                'isBase64Encoded': False
+            }
+        
         # Проверяем, нужно ли обновлять данные (проверяем возраст БД в секундах)
-        should_fetch = auto_update_enabled and db_manager.should_update_seconds(side, UPDATE_INTERVAL_SECONDS)
+        try:
+            should_fetch = auto_update_enabled and db_manager.should_update_seconds(side, UPDATE_INTERVAL_SECONDS)
+        except Exception as e:
+            logging.error(f'Error checking should_update: {e}')
+            should_fetch = False
         
         if not should_fetch:
             # Возвращаем данные из базы
-            offers = db_manager.get_offers(side)
-            last_update = db_manager.get_last_update(side)
+            try:
+                offers = db_manager.get_offers(side)
+                last_update = db_manager.get_last_update(side)
+            except Exception as e:
+                logging.error(f'Error reading offers from DB: {e}')
+                # Возвращаем пустой результат
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*',
+                        'X-Cache': 'ERROR'
+                    },
+                    'body': json.dumps({
+                        'offers': [],
+                        'total': 0,
+                        'side': 'sell' if side == '1' else 'buy',
+                        'from_cache': False,
+                        'error': 'Database temporarily unavailable',
+                        'auto_update_enabled': auto_update_enabled,
+                        'proxy_stats': {}
+                    }),
+                    'isBase64Encoded': False
+                }
+            
+            # Сохраняем в память
+            db_cache[cache_key]['data'] = {
+                'offers': offers,
+                'total': len(offers),
+                'side': 'sell' if side == '1' else 'buy'
+            }
+            db_cache[cache_key]['timestamp'] = now_ts
             
             return {
                 'statusCode': 200,
