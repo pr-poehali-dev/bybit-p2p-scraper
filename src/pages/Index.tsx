@@ -18,6 +18,7 @@ const Index = () => {
   const [proxyStats, setProxyStats] = useState<any>(null);
   const [nextUpdateIn, setNextUpdateIn] = useState<number>(5);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
+  const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
   const [loadingProgress, setLoadingProgress] = useState<string>('');
 
@@ -87,6 +88,11 @@ const Index = () => {
         throw new Error(data.error);
       }
       
+      // Обновляем глобальный статус автообновления
+      if (typeof data.auto_update_enabled === 'boolean') {
+        setGlobalAutoUpdateEnabled(data.auto_update_enabled);
+      }
+      
       // Определяем источник данных
       const cacheHeader = response.headers.get('X-Cache');
       if (cacheHeader === 'DB-HIT') {
@@ -147,8 +153,52 @@ const Index = () => {
     }
   };
 
+  const checkStatus = async () => {
+    try {
+      const response = await fetch(`${API_URL}?status=true`);
+      const data = await response.json();
+      if (typeof data.auto_update_enabled === 'boolean') {
+        setGlobalAutoUpdateEnabled(data.auto_update_enabled);
+      }
+    } catch (error) {
+      console.error('Failed to check status:', error);
+    }
+  };
+  
+  const toggleGlobalAutoUpdate = async () => {
+    try {
+      const newState = !globalAutoUpdateEnabled;
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'toggle_auto_update',
+          enabled: newState
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setGlobalAutoUpdateEnabled(newState);
+        toast({
+          title: newState ? 'Автообновление включено' : 'Автообновление выключено',
+          description: newState ? 'БД будет обновляться каждые 90 сек' : 'БД не будет обновляться автоматически'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось изменить настройку',
+        variant: 'destructive'
+      });
+    }
+  };
+
   useEffect(() => {
     loadAllOffers();
+    checkStatus();
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
@@ -166,6 +216,7 @@ const Index = () => {
     // Автообновление каждые 5 секунд (чтение из БД, не тратит лимиты!)
     const intervalId = setInterval(() => {
       loadAllOffers();
+      checkStatus(); // Проверяем глобальный статус
     }, 5 * 1000);
     
     return () => {
@@ -295,6 +346,16 @@ const Index = () => {
                 </span>
               )}
               <Button 
+                onClick={toggleGlobalAutoUpdate}
+                variant={globalAutoUpdateEnabled ? "default" : "destructive"}
+                size="sm"
+                className="h-7 text-xs"
+                title={globalAutoUpdateEnabled ? "Выключить автообновление БД (для всех пользователей)" : "Включить автообновление БД (для всех пользователей)"}
+              >
+                <Icon name={globalAutoUpdateEnabled ? "Power" : "PowerOff"} size={12} className="mr-1" />
+                {globalAutoUpdateEnabled ? 'Стакан ВКЛ' : 'Стакан ВЫКЛ'}
+              </Button>
+              <Button 
                 onClick={() => loadAllOffers()}
                 disabled={isLoading}
                 variant="outline"
@@ -308,6 +369,18 @@ const Index = () => {
             </div>
           </div>
         </div>
+
+        {!globalAutoUpdateEnabled && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2 text-center">
+            <div className="flex items-center justify-center gap-2 text-sm text-destructive">
+              <Icon name="AlertTriangle" size={16} />
+              <span className="font-semibold">Автообновление БД отключено!</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Данные в стакане не обновляются. Нажмите "Стакан ВЫКЛ" чтобы включить обновление.
+            </p>
+          </div>
+        )}
 
         <FiltersPanel
           onlyMerchants={onlyMerchants}

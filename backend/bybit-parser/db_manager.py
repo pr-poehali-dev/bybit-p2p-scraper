@@ -149,3 +149,43 @@ class DatabaseManager:
         now = datetime.now()
         time_diff = (now - last_update).total_seconds()
         return time_diff >= interval_seconds
+    
+    def is_auto_update_enabled(self) -> bool:
+        """Проверка глобального статуса автообновления."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    SELECT setting_value FROM {self.schema}.system_settings 
+                    WHERE setting_key = 'auto_update_enabled'
+                """)
+                row = cur.fetchone()
+                return row[0].lower() == 'true' if row else True
+        except Exception as e:
+            logger.error(f"Error checking auto_update_enabled: {e}")
+            return True  # По умолчанию включено
+        finally:
+            conn.close()
+    
+    def set_auto_update_enabled(self, enabled: bool, updated_by: str = 'user') -> bool:
+        """Установка глобального статуса автообновления."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    INSERT INTO {self.schema}.system_settings (setting_key, setting_value, updated_at, updated_by)
+                    VALUES ('auto_update_enabled', %s, %s, %s)
+                    ON CONFLICT (setting_key) 
+                    DO UPDATE SET setting_value = EXCLUDED.setting_value, 
+                                  updated_at = EXCLUDED.updated_at,
+                                  updated_by = EXCLUDED.updated_by
+                """, ('true' if enabled else 'false', datetime.now(), updated_by))
+                conn.commit()
+                logger.info(f"Auto-update set to {enabled} by {updated_by}")
+                return True
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error setting auto_update_enabled: {e}")
+            return False
+        finally:
+            conn.close()

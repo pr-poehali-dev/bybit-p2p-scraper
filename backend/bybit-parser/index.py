@@ -71,7 +71,7 @@ def handler(event: dict, context) -> dict:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
@@ -79,25 +79,80 @@ def handler(event: dict, context) -> dict:
             'isBase64Encoded': False
         }
     
-    if method != 'GET':
-        return {
-            'statusCode': 405,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({'error': 'Method not allowed'}),
-            'isBase64Encoded': False
-        }
-    
     params = event.get('queryStringParameters') or {}
+    
+    # POST запросы для управления настройками
+    if method == 'POST':
+        try:
+            body = json.loads(event.get('body', '{}'))
+            action = body.get('action')
+            
+            if action == 'toggle_auto_update':
+                enabled = body.get('enabled', True)
+                success = db_manager.set_auto_update_enabled(enabled)
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': json.dumps({
+                        'success': success,
+                        'auto_update_enabled': enabled
+                    }),
+                    'isBase64Encoded': False
+                }
+            
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': 'Unknown action'}),
+                'isBase64Encoded': False
+            }
+        except Exception as e:
+            return {
+                'statusCode': 500,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': str(e)}),
+                'isBase64Encoded': False
+            }
+    
+    # GET запросы для получения данных
     side = str(params.get('side', '1')) if params.get('side') else '1'
     debug = params.get('debug') == 'true'
     search_user = params.get('search', '').strip()
+    check_status = params.get('status') == 'true'
     
     try:
+        # Проверяем глобальный статус автообновления
+        auto_update_enabled = db_manager.is_auto_update_enabled()
+        
+        # Если запрос только на проверку статуса
+        if check_status:
+            last_update_sell = db_manager.get_last_update('1')
+            last_update_buy = db_manager.get_last_update('0')
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'auto_update_enabled': auto_update_enabled,
+                    'last_update_sell': last_update_sell.isoformat() if last_update_sell else None,
+                    'last_update_buy': last_update_buy.isoformat() if last_update_buy else None
+                }),
+                'isBase64Encoded': False
+            }
+        
         # Проверяем, нужно ли обновлять данные (проверяем возраст БД в секундах)
-        should_fetch = db_manager.should_update_seconds(side, UPDATE_INTERVAL_SECONDS)
+        should_fetch = auto_update_enabled and db_manager.should_update_seconds(side, UPDATE_INTERVAL_SECONDS)
         
         if not should_fetch:
             # Возвращаем данные из базы
@@ -118,6 +173,7 @@ def handler(event: dict, context) -> dict:
                     'side': 'sell' if side == '1' else 'buy',
                     'from_cache': True,
                     'last_update': last_update.isoformat() if last_update else None,
+                    'auto_update_enabled': auto_update_enabled,
                     'proxy_stats': {}
                 }),
                 'isBase64Encoded': False
