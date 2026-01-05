@@ -6,6 +6,7 @@ import { P2POffer, PriceChange } from '@/components/p2p/types';
 import { StatisticsCards } from '@/components/p2p/StatisticsCards';
 import { FiltersPanel } from '@/components/p2p/FiltersPanel';
 import { OrderbookTable } from '@/components/p2p/OrderbookTable';
+import { StatsPanel } from '@/components/p2p/StatsPanel';
 
 const API_URL = 'https://functions.poehali.dev/ea8079f5-9a7d-41e0-9530-698a124a62b8';
 
@@ -16,10 +17,11 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(60);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(8);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
+  const [backendInterval, setBackendInterval] = useState<number>(25);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -138,7 +140,7 @@ const Index = () => {
 
   const loadAllOffers = async () => {
     setIsLoading(true);
-    setNextUpdateIn(60);
+    setNextUpdateIn(8);
     try {
       await Promise.all([
         fetchOffers('1', false),
@@ -155,6 +157,9 @@ const Index = () => {
       const data = await response.json();
       if (typeof data.auto_update_enabled === 'boolean') {
         setGlobalAutoUpdateEnabled(data.auto_update_enabled);
+      }
+      if (typeof data.update_interval_seconds === 'number') {
+        setBackendInterval(data.update_interval_seconds);
       }
     } catch (error) {
       console.error('Failed to check status:', error);
@@ -198,7 +203,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 60);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 8);
     }, 1000);
     
     return () => {
@@ -209,11 +214,11 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // Автообновление каждые 60 секунд (оптимально для лимитов)
+    // Автообновление каждые 8 секунд (быстрый стакан с лимитом 30k)
     const intervalId = setInterval(() => {
       loadAllOffers();
-      checkStatus(); // Проверяем глобальный статус
-    }, 60 * 1000);
+      checkStatus();
+    }, 8 * 1000);
     
     return () => {
       clearInterval(intervalId);
@@ -226,7 +231,7 @@ const Index = () => {
       if (onlyOnline && !offer.is_online) return false;
       if (noTriangle && offer.is_triangle) return false;
       
-      if (paymentMethod && !offer.payment_methods.includes(paymentMethod)) return false;
+      if (paymentMethod && !offer.payment_methods.some(pm => pm.toLowerCase().includes(paymentMethod.toLowerCase()))) return false;
       
       if (amountLimit) {
         const amount = parseFloat(amountLimit);
@@ -245,7 +250,7 @@ const Index = () => {
       if (onlyOnline && !offer.is_online) return false;
       if (noTriangle && offer.is_triangle) return false;
       
-      if (paymentMethod && !offer.payment_methods.includes(paymentMethod)) return false;
+      if (paymentMethod && !offer.payment_methods.some(pm => pm.toLowerCase().includes(paymentMethod.toLowerCase()))) return false;
       
       if (amountLimit) {
         const amount = parseFloat(amountLimit);
@@ -372,6 +377,12 @@ const Index = () => {
             </p>
           </div>
         )}
+
+        <StatsPanel 
+          frontendIntervalSeconds={8}
+          backendIntervalSeconds={backendInterval}
+          autoUpdateEnabled={globalAutoUpdateEnabled}
+        />
 
         <FiltersPanel
           onlyMerchants={onlyMerchants}

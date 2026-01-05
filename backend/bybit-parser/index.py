@@ -36,7 +36,7 @@ db_cache = {
     'buy': {'data': None, 'timestamp': None},
     'auto_update_enabled': {'value': True, 'timestamp': None}
 }
-DB_CACHE_TTL_SECONDS = 5  # Кеш БД на 5 секунд
+DB_CACHE_TTL_SECONDS = 3  # Кеш БД на 3 секунды (более свежие данные)
 
 # Инициализация глобального прокси-менеджера
 proxy_manager = ProxyManager(
@@ -50,7 +50,7 @@ proxy_manager = ProxyManager(
 # Инициализация менеджера базы данных
 db_manager = DatabaseManager()
 
-UPDATE_INTERVAL_SECONDS = 90  # 1.5 минуты = 960 вызовов/сутки
+UPDATE_INTERVAL_SECONDS = 25  # 25 секунд = 3456 вызовов/сутки (оптимально для лимита 30k)
 
 # Маппинг ID методов оплаты Bybit на названия
 PAYMENT_METHOD_MAP = {
@@ -236,7 +236,8 @@ def handler(event: dict, context) -> dict:
                 'body': json.dumps({
                     'auto_update_enabled': auto_update_enabled,
                     'last_update_sell': last_update_sell.isoformat() if last_update_sell else None,
-                    'last_update_buy': last_update_buy.isoformat() if last_update_buy else None
+                    'last_update_buy': last_update_buy.isoformat() if last_update_buy else None,
+                    'update_interval_seconds': UPDATE_INTERVAL_SECONDS
                 }),
                 'isBase64Encoded': False
             }

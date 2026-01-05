@@ -3,6 +3,7 @@ import Icon from '@/components/ui/icon';
 import { P2POffer, PriceChange } from './types';
 import { PaymentMethodIcon } from './PaymentMethodIcon';
 import { memo, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface OrderbookTableProps {
   title: string;
@@ -20,7 +21,17 @@ const OfferRow = memo(({ offer, idx, icon, textClass, priceChanges, getPriceChan
   const isRedHighlighted = RED_HIGHLIGHTED_IDS.includes(offer.maker_id);
   
   return (
-    <tr 
+    <motion.tr
+      layout
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ 
+        type: "spring",
+        stiffness: 500,
+        damping: 50,
+        mass: 1
+      }} 
       key={offer.id} 
       style={{
         backgroundColor: isHighlighted 
@@ -88,7 +99,7 @@ const OfferRow = memo(({ offer, idx, icon, textClass, priceChanges, getPriceChan
           <span className="text-[8px] text-muted-foreground">{offer.total_orders}%</span>
         </div>
       </td>
-    </tr>
+    </motion.tr>
   );
 });
 
@@ -148,19 +159,21 @@ export const OrderbookTable = memo(({
                 </tr>
               </thead>
               <tbody>
-                {offers.map((offer, idx) => (
-                  <OfferRow 
-                    key={offer.id}
-                    offer={offer}
-                    idx={idx}
-                    icon={icon}
-                    textClass={textClass}
-                    priceChanges={priceChanges}
-                    getPriceChangeClass={getPriceChangeClass}
-                    HIGHLIGHTED_IDS={HIGHLIGHTED_IDS}
-                    RED_HIGHLIGHTED_IDS={RED_HIGHLIGHTED_IDS}
-                  />
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {offers.map((offer, idx) => (
+                    <OfferRow 
+                      key={`${offer.maker_id}-${offer.price}`}
+                      offer={offer}
+                      idx={idx}
+                      icon={icon}
+                      textClass={textClass}
+                      priceChanges={priceChanges}
+                      getPriceChangeClass={getPriceChangeClass}
+                      HIGHLIGHTED_IDS={HIGHLIGHTED_IDS}
+                      RED_HIGHLIGHTED_IDS={RED_HIGHLIGHTED_IDS}
+                    />
+                  ))}
+                </AnimatePresence>
               </tbody>
             </table>
             {offers.length === 0 && !isLoading && (
