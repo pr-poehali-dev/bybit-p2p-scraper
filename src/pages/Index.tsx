@@ -15,7 +15,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(19);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(10);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
@@ -120,7 +120,7 @@ const Index = () => {
 
   const loadAllOffers = async (forceUpdate = false) => {
     setIsLoading(true);
-    setNextUpdateIn(19);
+    setNextUpdateIn(10);
     
     try {
       const forceSuffix = forceUpdate ? '&force=true' : '';
@@ -244,7 +244,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 19);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 10);
     }, 1000);
     
     return () => {
@@ -255,11 +255,11 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 19 секунд (легкий запрос)
+    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 10 секунд (легкий запрос)
     // Данные грузим только если БД реально обновилась
     const intervalId = setInterval(() => {
       checkStatus(); // Легкий запрос - только проверка timestamp
-    }, 19 * 1000);
+    }, 10 * 1000);
     
     return () => {
       clearInterval(intervalId);
