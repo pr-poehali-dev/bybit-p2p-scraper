@@ -87,6 +87,11 @@ const Index = () => {
         throw new Error(data.error);
       }
       
+      // Не показываем warning если используется устаревший кеш
+      if (data.warning && !silent) {
+        return; // Пропускаем warning, чтобы не раздражать пользователя
+      }
+      
       // Обновляем глобальный статус автообновления
       if (typeof data.auto_update_enabled === 'boolean') {
         setGlobalAutoUpdateEnabled(data.auto_update_enabled);
@@ -180,7 +185,7 @@ const Index = () => {
         setGlobalAutoUpdateEnabled(newState);
         toast({
           title: newState ? 'Автообновление включено' : 'Автообновление выключено',
-          description: newState ? 'БД будет обновляться каждые 90 сек' : 'БД не будет обновляться автоматически'
+          description: newState ? 'БД будет обновляться каждые 25 сек' : 'БД не будет обновляться автоматически'
         });
       }
     } catch (error) {

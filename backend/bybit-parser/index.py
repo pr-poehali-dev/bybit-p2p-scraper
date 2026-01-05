@@ -319,26 +319,9 @@ def handler(event: dict, context) -> dict:
                         'isBase64Encoded': False
                     }
                 
-                # Нет кеша вообще - возвращаем пустой результат
-                logging.error(f'[CRITICAL] No cache available, returning empty')
-                return {
-                    'statusCode': 200,
-                    'headers': {
-                        'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*',
-                        'X-Cache': 'ERROR'
-                    },
-                    'body': json.dumps({
-                        'offers': [],
-                        'total': 0,
-                        'side': 'sell' if side == '1' else 'buy',
-                        'from_cache': False,
-                        'error': 'Database temporarily unavailable',
-                        'auto_update_enabled': auto_update_enabled,
-                        'proxy_stats': {}
-                    }),
-                    'isBase64Encoded': False
-                }
+                # Нет кеша вообще - загружаем с Bybit
+                logging.warning(f'[NO-CACHE] No cache available, fetching from Bybit')
+                # Продолжаем выполнение - загрузим с Bybit ниже
             
             # Сохраняем в память
             db_cache[cache_key]['data'] = {
