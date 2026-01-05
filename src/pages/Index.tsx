@@ -20,6 +20,10 @@ const Index = () => {
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
+  
+  // Храним последние известные timestamp БД для каждой стороны
+  const [lastDbUpdateSell, setLastDbUpdateSell] = useState<string | null>(null);
+  const [lastDbUpdateBuy, setLastDbUpdateBuy] = useState<string | null>(null);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -154,12 +158,35 @@ const Index = () => {
     }
   };
 
-  const checkStatus = async () => {
+  const checkStatus = async (skipDataLoad = false) => {
     try {
       const response = await fetch(`${API_URL}?status=true`);
       const data = await response.json();
       if (typeof data.auto_update_enabled === 'boolean') {
         setGlobalAutoUpdateEnabled(data.auto_update_enabled);
+      }
+      
+      // Проверяем, изменились ли данные в БД
+      let needsUpdate = false;
+      
+      if (data.last_update_sell && data.last_update_sell !== lastDbUpdateSell) {
+        console.log('📊 Sell side updated:', data.last_update_sell);
+        setLastDbUpdateSell(data.last_update_sell);
+        if (lastDbUpdateSell !== null) needsUpdate = true; // Только если это не первая проверка
+      }
+      
+      if (data.last_update_buy && data.last_update_buy !== lastDbUpdateBuy) {
+        console.log('📊 Buy side updated:', data.last_update_buy);
+        setLastDbUpdateBuy(data.last_update_buy);
+        if (lastDbUpdateBuy !== null) needsUpdate = true; // Только если это не первая проверка
+      }
+      
+      // Если БД обновилась - загружаем новые данные (но не при первой загрузке)
+      if (needsUpdate && !skipDataLoad) {
+        console.log('🔄 DB changed! Loading fresh data from database...');
+        await loadAllOffers();
+      } else if (!needsUpdate && !skipDataLoad) {
+        console.log('✅ DB unchanged, skipping data load (saving API calls)');
       }
     } catch (error) {
       console.error('Failed to check status:', error);
@@ -198,8 +225,13 @@ const Index = () => {
   };
 
   useEffect(() => {
-    loadAllOffers();
-    checkStatus();
+    // Первая загрузка данных + получение timestamps
+    const initData = async () => {
+      await checkStatus(true); // Получаем timestamps (без загрузки данных)
+      await loadAllOffers(); // Загружаем данные
+    };
+    
+    initData();
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
@@ -214,16 +246,16 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // Автообновление каждые 8 секунд (быстрый стакан с лимитом 30k)
+    // ОПТИМИЗАЦИЯ: Проверяем статус БД каждые 8 секунд (легкий запрос)
+    // Данные грузим только если БД реально обновилась
     const intervalId = setInterval(() => {
-      loadAllOffers();
-      checkStatus();
+      checkStatus(); // Легкий запрос - только проверка timestamp
     }, 8 * 1000);
     
     return () => {
       clearInterval(intervalId);
     };
-  }, [autoUpdateEnabled]);
+  }, [autoUpdateEnabled, lastDbUpdateSell, lastDbUpdateBuy]);
 
   const filteredSellOffers = useMemo(() => {
     return sellOffers.filter(offer => {
