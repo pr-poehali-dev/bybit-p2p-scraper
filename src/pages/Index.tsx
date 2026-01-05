@@ -130,11 +130,6 @@ const Index = () => {
 
   useEffect(() => {
     loadAllOffers();
-    const interval = setInterval(() => {
-      fetchOffers('1', true);
-      fetchOffers('0', true);
-    }, 15000);
-    return () => clearInterval(interval);
   }, []);
 
   const filteredSellOffers = useMemo(() => {
