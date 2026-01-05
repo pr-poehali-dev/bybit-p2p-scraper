@@ -17,6 +17,7 @@ const Index = () => {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
   const [nextUpdateIn, setNextUpdateIn] = useState<number>(600);
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -133,21 +134,28 @@ const Index = () => {
   useEffect(() => {
     loadAllOffers();
     
-    // Автообновление каждые 10 минут
-    const intervalId = setInterval(() => {
-      loadAllOffers();
-    }, 10 * 60 * 1000);
-    
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
       setNextUpdateIn(prev => prev > 0 ? prev - 1 : 600);
     }, 1000);
     
     return () => {
-      clearInterval(intervalId);
       clearInterval(countdownId);
     };
   }, []);
+
+  useEffect(() => {
+    if (!autoUpdateEnabled) return;
+    
+    // Автообновление каждые 10 минут
+    const intervalId = setInterval(() => {
+      loadAllOffers();
+    }, 10 * 60 * 1000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [autoUpdateEnabled]);
 
   const filteredSellOffers = useMemo(() => {
     return sellOffers.filter(offer => {
@@ -218,10 +226,18 @@ const Index = () => {
                   <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? 'bg-primary animate-pulse' : 'bg-success'}`} />
                   {lastUpdate.toLocaleTimeString('ru-RU')}
                 </div>
-                <div className="flex items-center gap-1 text-[9px] opacity-70">
-                  <Icon name="Timer" size={10} />
-                  {Math.floor(nextUpdateIn / 60)}:{String(nextUpdateIn % 60).padStart(2, '0')}
-                </div>
+                <button
+                  onClick={() => setAutoUpdateEnabled(!autoUpdateEnabled)}
+                  className="flex items-center gap-1 text-[9px] opacity-70 hover:opacity-100 transition-opacity"
+                  title={автообновление ${autoUpdateEnabled ? 'вкл' : 'выкл'}}
+                >
+                  <Icon name={autoUpdateEnabled ? "Timer" : "TimerOff"} size={10} />
+                  {autoUpdateEnabled ? (
+                    <>{Math.floor(nextUpdateIn / 60)}:{String(nextUpdateIn % 60).padStart(2, '0')}</>
+                  ) : (
+                    <>Выкл</>
+                  )}
+                </button>
                 {proxyStats && proxyStats.success_rate && (
                   <span className="text-[9px] opacity-60" title="Proxy Success Rate">
                     🔒 {proxyStats.success_rate.toFixed(0)}%

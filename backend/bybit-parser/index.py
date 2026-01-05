@@ -16,6 +16,7 @@ from config import (
     PROXY_USE_PROBABILITY,
     ENABLE_PROXY_LOGGING
 )
+from db_manager import DatabaseManager
 
 # Настройка логирования
 logging.basicConfig(
@@ -35,6 +36,11 @@ proxy_manager = ProxyManager(
     timeout=REQUEST_TIMEOUT,
     enable_logging=ENABLE_PROXY_LOGGING
 )
+
+# Инициализация менеджера базы данных
+db_manager = DatabaseManager()
+
+UPDATE_INTERVAL_MINUTES = 10
 
 def handler(event: dict, context) -> dict:
     '''
@@ -72,23 +78,38 @@ def handler(event: dict, context) -> dict:
     side = str(params.get('side', '1')) if params.get('side') else '1'
     debug = params.get('debug') == 'true'
     search_user = params.get('search', '').strip()
+    force_update = params.get('force') == 'true'
     
-    cache_key = f'offers_{side}'
-    now = datetime.now()
-    
-    if cache_key in cache:
-        cached_data, cached_time = cache[cache_key]
-        if now - cached_time < timedelta(seconds=CACHE_TTL):
+    try:
+        # Проверяем, нужно ли обновлять данные
+        should_fetch = force_update or db_manager.should_update(side, UPDATE_INTERVAL_MINUTES)
+        
+        if not should_fetch:
+            # Возвращаем данные из базы
+            offers = db_manager.get_offers(side)
+            last_update = db_manager.get_last_update(side)
+            
             return {
                 'statusCode': 200,
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*',
-                    'X-Cache': 'HIT'
+                    'X-Cache': 'DB-HIT',
+                    'X-Last-Update': last_update.isoformat() if last_update else ''
                 },
-                'body': json.dumps(cached_data),
+                'body': json.dumps({
+                    'offers': offers,
+                    'from_cache': True,
+                    'last_update': last_update.isoformat() if last_update else None
+                }),
                 'isBase64Encoded': False
             }
+    except Exception as e:
+        logging.error(f'Error reading from database: {e}')
+        # При ошибке БД продолжаем обычную загрузку
+    
+    cache_key = f'offers_{side}'
+    now = datetime.now()
     
     try:
         url = 'https://api2.bybit.com/fiat/otc/item/online'
@@ -316,13 +337,40 @@ def handler(event: dict, context) -> dict:
                 'proxy_stats': proxy_manager.get_stats()  # Статистика прокси
             }
         
+        # Сохраняем в базу данных (только для основных запросов, не поиска)
         if not search_user:
+            try:
+                # Преобразуем данные для БД
+                offers_for_db = []
+                for offer in all_offers:
+                    offers_for_db.append({
+                        'id': offer['id'],
+                        'price': offer['price'],
+                        'min_amount': offer['min_amount'],
+                        'max_amount': offer['max_amount'],
+                        'available_amount': offer['quantity'],
+                        'nickname': offer['maker'],
+                        'is_merchant': offer['is_merchant'],
+                        'merchant_type': offer['merchant_type'],
+                        'is_online': offer['is_online'],
+                        'is_triangle': offer['is_triangle'],
+                        'completion_rate': offer['completion_rate'],
+                        'completed_orders': offer['total_orders'],
+                        'payment_methods': offer['payment_methods']
+                    })
+                
+                db_manager.save_offers(offers_for_db, side)
+                logging.info(f'Successfully saved {len(offers_for_db)} offers to database for side {side}')
+            except Exception as e:
+                logging.error(f'Failed to save to database: {e}')
+            
             cache[cache_key] = (result_data, datetime.now())
         
         headers_dict = {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'X-Cache': 'MISS'
+            'X-Cache': 'MISS',
+            'X-Saved-To-DB': 'true' if not search_user else 'false'
         }
         
         # Добавляем статистику прокси в заголовки для мониторинга
