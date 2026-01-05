@@ -1,19 +1,59 @@
 import os
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
 class DatabaseManager:
+    _pool = None
+    
     def __init__(self):
         self.dsn = os.environ.get('DATABASE_URL')
         self.schema = os.environ.get('MAIN_DB_SCHEMA', 't_p69186337_bybit_p2p_scraper')
         
+        # Инициализируем connection pool один раз
+        if DatabaseManager._pool is None:
+            try:
+                DatabaseManager._pool = psycopg2.pool.SimpleConnectionPool(
+                    minconn=1,
+                    maxconn=3,  # Ограничиваем максимум 3 соединения
+                    dsn=self.dsn
+                )
+                logger.info("Database connection pool created")
+            except Exception as e:
+                logger.error(f"Failed to create connection pool: {e}")
+                DatabaseManager._pool = None
+        
     def get_connection(self):
+        if DatabaseManager._pool:
+            try:
+                return DatabaseManager._pool.getconn()
+            except Exception as e:
+                logger.error(f"Failed to get connection from pool: {e}")
+                # Fallback к прямому подключению
+                return psycopg2.connect(self.dsn)
         return psycopg2.connect(self.dsn)
+    
+    def put_connection(self, conn):
+        if DatabaseManager._pool:
+            try:
+                DatabaseManager._pool.putconn(conn)
+            except Exception as e:
+                logger.error(f"Failed to return connection to pool: {e}")
+                try:
+                    conn.close()
+                except:
+                    pass
+        else:
+            try:
+                conn.close()
+            except:
+                pass
     
     def save_offers(self, offers: List[Dict[str, Any]], side: str) -> int:
         """Сохранение офферов в базу данных. Возвращает количество сохраненных записей."""
@@ -70,7 +110,7 @@ class DatabaseManager:
             logger.error(f"Error saving offers: {e}")
             raise
         finally:
-            conn.close()
+            self.put_connection(conn)
     
     def get_offers(self, side: str) -> List[Dict[str, Any]]:
         """Получение офферов из базы данных."""
@@ -90,18 +130,24 @@ class DatabaseManager:
                 
                 offers = []
                 for row in rows:
+                    # Конвертируем Decimal в float для JSON сериализации
+                    def to_float(val):
+                        if isinstance(val, Decimal):
+                            return float(val)
+                        return val
+                    
                     offers.append({
                         'id': row['id'],
-                        'price': float(row['price']),
+                        'price': to_float(row['price']),
                         'maker': row['nickname'],
                         'maker_id': '',
-                        'quantity': float(row['available_amount']),
-                        'min_amount': float(row['min_amount']),
-                        'max_amount': float(row['max_amount']),
+                        'quantity': to_float(row['available_amount']),
+                        'min_amount': to_float(row['min_amount']),
+                        'max_amount': to_float(row['max_amount']),
                         'payment_methods': row['payment_methods'].split(',') if row['payment_methods'] else [],
                         'side': 'sell' if side == '1' else 'buy',
-                        'completion_rate': int(row['completion_rate']) if row['completion_rate'] else 0,
-                        'total_orders': row['completed_orders'],
+                        'completion_rate': int(to_float(row['completion_rate'])) if row['completion_rate'] else 0,
+                        'total_orders': int(to_float(row['completed_orders'])) if row['completed_orders'] else 0,
                         'is_merchant': row['is_merchant'],
                         'merchant_type': row['merchant_type'],
                         'merchant_badge': f'va{row["merchant_type"].capitalize()}Icon' if row['merchant_type'] else None,
@@ -114,7 +160,7 @@ class DatabaseManager:
                 
                 return offers
         finally:
-            conn.close()
+            self.put_connection(conn)
     
     def get_last_update(self, side: str) -> Optional[datetime]:
         """Получение времени последнего обновления."""
@@ -128,7 +174,7 @@ class DatabaseManager:
                 row = cur.fetchone()
                 return row[0] if row else None
         finally:
-            conn.close()
+            self.put_connection(conn)
     
     def should_update(self, side: str, interval_minutes: int = 10) -> bool:
         """Проверка необходимости обновления данных (в минутах)."""
@@ -165,7 +211,7 @@ class DatabaseManager:
             logger.error(f"Error checking auto_update_enabled: {e}")
             return True  # По умолчанию включено
         finally:
-            conn.close()
+            self.put_connection(conn)
     
     def set_auto_update_enabled(self, enabled: bool, updated_by: str = 'user') -> bool:
         """Установка глобального статуса автообновления."""
@@ -188,4 +234,4 @@ class DatabaseManager:
             logger.error(f"Error setting auto_update_enabled: {e}")
             return False
         finally:
-            conn.close()
+            self.put_connection(conn)
