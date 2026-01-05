@@ -92,19 +92,24 @@ class DatabaseManager:
                 for row in rows:
                     offers.append({
                         'id': row['id'],
-                        'side': row['side'],
                         'price': float(row['price']),
+                        'maker': row['nickname'],
+                        'maker_id': '',
+                        'quantity': float(row['available_amount']),
                         'min_amount': float(row['min_amount']),
                         'max_amount': float(row['max_amount']),
-                        'available_amount': float(row['available_amount']),
-                        'nickname': row['nickname'],
+                        'payment_methods': row['payment_methods'].split(',') if row['payment_methods'] else [],
+                        'side': 'sell' if side == '1' else 'buy',
+                        'completion_rate': int(row['completion_rate']) if row['completion_rate'] else 0,
+                        'total_orders': row['completed_orders'],
                         'is_merchant': row['is_merchant'],
                         'merchant_type': row['merchant_type'],
+                        'merchant_badge': f'va{row["merchant_type"].capitalize()}Icon' if row['merchant_type'] else None,
+                        'is_block_trade': row['merchant_type'] == 'block_trade' if row['merchant_type'] else False,
                         'is_online': row['is_online'],
                         'is_triangle': row['is_triangle'],
-                        'completion_rate': float(row['completion_rate']) if row['completion_rate'] else 0,
-                        'completed_orders': row['completed_orders'],
-                        'payment_methods': row['payment_methods'].split(',') if row['payment_methods'] else []
+                        'last_logout_time': '',
+                        'auth_tags': []
                     })
                 
                 return offers

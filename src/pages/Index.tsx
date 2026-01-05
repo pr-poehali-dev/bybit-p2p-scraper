@@ -52,12 +52,14 @@ const Index = () => {
     prevOffersRef.current = newPriceMap;
   };
 
-  const fetchOffers = async (side: '1' | '0', silent = false) => {
+  const fetchOffers = async (side: '1' | '0', silent = false, force = false) => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
-      const response = await fetch(`${API_URL}?side=${side}`, {
+      const url = force ? `${API_URL}?side=${side}&force=true` : `${API_URL}?side=${side}`;
+      
+      const response = await fetch(url, {
         signal: controller.signal,
         headers: {
           'Accept': 'application/json'
@@ -118,13 +120,13 @@ const Index = () => {
     }
   };
 
-  const loadAllOffers = async () => {
+  const loadAllOffers = async (force = false) => {
     setIsLoading(true);
     setNextUpdateIn(600);
     try {
       await Promise.all([
-        fetchOffers('1'),
-        fetchOffers('0')
+        fetchOffers('1', false, force),
+        fetchOffers('0', false, force)
       ]);
     } finally {
       setIsLoading(false);
@@ -246,11 +248,12 @@ const Index = () => {
               </div>
             )}
             <Button 
-              onClick={loadAllOffers}
+              onClick={() => loadAllOffers(true)}
               disabled={isLoading}
               variant="outline"
               size="sm"
               className="h-7 text-xs"
+              title="Принудительно загрузить свежие данные с Bybit"
             >
               <Icon name="RefreshCw" size={12} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               Обновить

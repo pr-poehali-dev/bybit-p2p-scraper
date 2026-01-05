@@ -99,8 +99,11 @@ def handler(event: dict, context) -> dict:
                 },
                 'body': json.dumps({
                     'offers': offers,
+                    'total': len(offers),
+                    'side': 'sell' if side == '1' else 'buy',
                     'from_cache': True,
-                    'last_update': last_update.isoformat() if last_update else None
+                    'last_update': last_update.isoformat() if last_update else None,
+                    'proxy_stats': {}
                 }),
                 'isBase64Encoded': False
             }
