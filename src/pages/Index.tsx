@@ -130,6 +130,13 @@ const Index = () => {
 
   useEffect(() => {
     loadAllOffers();
+    
+    // Автообновление каждые 10 минут
+    const intervalId = setInterval(() => {
+      loadAllOffers();
+    }, 10 * 60 * 1000); // 10 минут в миллисекундах
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   const filteredSellOffers = useMemo(() => {
