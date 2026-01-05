@@ -19,6 +19,7 @@ const Index = () => {
   const [nextUpdateIn, setNextUpdateIn] = useState<number>(300);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState<string>('');
 
   const prevOffersRef = useRef<Map<string, number>>(new Map());
 
@@ -133,13 +134,16 @@ const Index = () => {
   const loadAllOffers = async (force = false) => {
     setIsLoading(true);
     setNextUpdateIn(300);
+    setLoadingProgress('Загрузка...');
     try {
-      await Promise.all([
-        fetchOffers('1', false, force),
-        fetchOffers('0', false, force)
-      ]);
+      setLoadingProgress('Загрузка продажи...');
+      await fetchOffers('1', false, force);
+      setLoadingProgress('Загрузка покупки...');
+      await fetchOffers('0', false, force);
+      setLoadingProgress('Готово!');
     } finally {
       setIsLoading(false);
+      setTimeout(() => setLoadingProgress(''), 500);
     }
   };
 
@@ -284,17 +288,24 @@ const Index = () => {
                 )}
               </div>
             )}
-            <Button 
-              onClick={() => loadAllOffers(false)}
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              title="Обновить данные (из БД или Bybit если БД старше 1 минуты)"
-            >
-              <Icon name="RefreshCw" size={12} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-              Обновить
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {loadingProgress && (
+                <span className="text-[9px] text-muted-foreground animate-pulse">
+                  {loadingProgress}
+                </span>
+              )}
+              <Button 
+                onClick={() => loadAllOffers(false)}
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                title="Обновить данные (из БД или Bybit если БД старше 1 минуты)"
+              >
+                <Icon name="RefreshCw" size={12} className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                Обновить
+              </Button>
+            </div>
           </div>
         </div>
 
