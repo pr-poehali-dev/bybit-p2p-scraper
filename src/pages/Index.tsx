@@ -15,14 +15,12 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(10);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(25);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
   
-  // Храним последние известные timestamp БД для каждой стороны
-  const [lastDbUpdateSell, setLastDbUpdateSell] = useState<string | null>(null);
-  const [lastDbUpdateBuy, setLastDbUpdateBuy] = useState<string | null>(null);
+
 
 
 
@@ -34,93 +32,10 @@ const Index = () => {
 
 
 
-  const fetchOffers = async (side: '1' | '0', silent = false) => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      const url = `${API_URL}?side=${side}`;
-      
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Превышен лимит запросов. Повторите попытку через минуту.');
-        }
-        if (response.status === 504 || response.status === 502) {
-          throw new Error('Сервер недоступен. Попробуйте позже.');
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
-      // Не показываем warning если используется устаревший кеш
-      if (data.warning && !silent) {
-        return; // Пропускаем warning, чтобы не раздражать пользователя
-      }
-      
-      // Обновляем глобальный статус автообновления
-      if (typeof data.auto_update_enabled === 'boolean') {
-        setGlobalAutoUpdateEnabled(data.auto_update_enabled);
-      }
-      
-      // Определяем источник данных
-      const cacheHeader = response.headers.get('X-Cache');
-      if (cacheHeader === 'DB-HIT') {
-        setDataSource('db');
-      } else {
-        setDataSource('bybit');
-      }
-      
-      const newOffers = data.offers || [];
-      
-      if (side === '1') {
-        setSellOffers(newOffers);
-      } else {
-        setBuyOffers(newOffers);
-      }
-      
-      // Сохраняем статистику прокси (если есть)
-      if (data.proxy_stats) {
-        setProxyStats(data.proxy_stats);
-      }
-      
-      setLastUpdate(new Date());
-    } catch (error) {
-      console.error('Failed to fetch offers:', error);
-      if (!silent) {
-        let errorMessage = 'Не удалось загрузить объявления';
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
-            errorMessage = 'Превышено время ожидания. API Bybit может быть перегружен.';
-          } else {
-            errorMessage = error.message;
-          }
-        }
-        toast({
-          title: 'Ошибка загрузки',
-          description: errorMessage,
-          variant: 'destructive'
-        });
-      }
-    }
-  };
 
   const loadAllOffers = async (forceUpdate = false) => {
     setIsLoading(true);
-    setNextUpdateIn(10);
+    setNextUpdateIn(25);
     
     try {
       const forceSuffix = forceUpdate ? '&force=true' : '';
@@ -164,43 +79,7 @@ const Index = () => {
     }
   };
 
-  const checkStatus = async (skipDataLoad = false) => {
-    try {
-      const response = await fetch(`${API_URL}?status=true`);
-      const data = await response.json();
-      if (typeof data.auto_update_enabled === 'boolean') {
-        setGlobalAutoUpdateEnabled(data.auto_update_enabled);
-      }
-      
-      // Проверяем, изменились ли данные в БД
-      let needsUpdate = false;
-      
-      if (data.last_update_sell && data.last_update_sell !== lastDbUpdateSell) {
-        console.log('📊 Sell side updated:', data.last_update_sell);
-        setLastDbUpdateSell(data.last_update_sell);
-        if (lastDbUpdateSell !== null) needsUpdate = true;
-      }
-      
-      if (data.last_update_buy && data.last_update_buy !== lastDbUpdateBuy) {
-        console.log('📊 Buy side updated:', data.last_update_buy);
-        setLastDbUpdateBuy(data.last_update_buy);
-        if (lastDbUpdateBuy !== null) needsUpdate = true;
-      }
-      
-      // ИСПРАВЛЕНИЕ: всегда загружаем данные (триггерим проверку бэкенда)
-      // Бэкенд сам решит: обновить с Bybit или вернуть кеш
-      if (!skipDataLoad) {
-        if (needsUpdate) {
-          console.log('🔄 DB changed! Loading fresh data from database...');
-        } else {
-          console.log('🔄 Checking backend for updates...');
-        }
-        await loadAllOffers();
-      }
-    } catch (error) {
-      console.error('Failed to check status:', error);
-    }
-  };
+
   
   const toggleGlobalAutoUpdate = async () => {
     try {
@@ -239,7 +118,7 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 10);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 25);
     }, 1000);
     
     return () => {
@@ -250,11 +129,11 @@ const Index = () => {
   useEffect(() => {
     if (!autoUpdateEnabled) return;
     
-    // ОПТИМИЗАЦИЯ: Загружаем данные каждые 10 секунд напрямую
+    // ОПТИМИЗАЦИЯ: Загружаем данные каждые 25 секунд напрямую
     // Бэкенд сам проверит нужно ли парсить Bybit или вернуть кеш
     const intervalId = setInterval(() => {
       loadAllOffers(); // Прямая загрузка без лишнего checkStatus()
-    }, 10 * 1000);
+    }, 25 * 1000);
     
     return () => {
       clearInterval(intervalId);
