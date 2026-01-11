@@ -15,7 +15,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(25);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(60);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
@@ -35,7 +35,7 @@ const Index = () => {
 
   const loadAllOffers = async (forceUpdate = false) => {
     setIsLoading(true);
-    setNextUpdateIn(25);
+    setNextUpdateIn(60);
     
     try {
       const forceSuffix = forceUpdate ? '&force=true' : '';
@@ -113,30 +113,25 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Первая загрузка данных
+    // Первая загрузка данных сразу
     loadAllOffers();
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 25);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 60);
     }, 1000);
+    
+    // Автообновление каждые 60 секунд (если включено)
+    let updateIntervalId: NodeJS.Timeout | null = null;
+    if (autoUpdateEnabled) {
+      updateIntervalId = setInterval(() => {
+        loadAllOffers();
+      }, 60 * 1000); // 60 секунд
+    }
     
     return () => {
       clearInterval(countdownId);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!autoUpdateEnabled) return;
-    
-    // ОПТИМИЗАЦИЯ: Загружаем данные каждые 25 секунд напрямую
-    // Бэкенд сам проверит нужно ли парсить Bybit или вернуть кеш
-    const intervalId = setInterval(() => {
-      loadAllOffers(); // Прямая загрузка без лишнего checkStatus()
-    }, 25 * 1000);
-    
-    return () => {
-      clearInterval(intervalId);
+      if (updateIntervalId) clearInterval(updateIntervalId);
     };
   }, [autoUpdateEnabled]);
 
