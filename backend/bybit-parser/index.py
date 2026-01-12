@@ -36,7 +36,7 @@ db_cache = {
     'buy': {'data': None, 'timestamp': None},
     'auto_update_enabled': {'value': True, 'timestamp': None}
 }
-DB_CACHE_TTL_SECONDS = 10  # Кеш БД на 10 секунд - все пользователи получают одни данные
+DB_CACHE_TTL_SECONDS = 120  # Кеш БД на 120 секунд (2 минуты) - экономия запросов к БД
 
 # Инициализация глобального прокси-менеджера
 proxy_manager = ProxyManager(
@@ -50,7 +50,7 @@ proxy_manager = ProxyManager(
 # Инициализация менеджера базы данных
 db_manager = DatabaseManager()
 
-UPDATE_INTERVAL_SECONDS = 10  # 10 секунд = 8640 вызовов/сутки (оптимально для лимита 30k)
+UPDATE_INTERVAL_SECONDS = 60  # 60 секунд = 1440 вызовов/сутки (экономия ресурсов)
 
 # Маппинг ID методов оплаты Bybit на названия
 PAYMENT_METHOD_MAP = {
