@@ -15,7 +15,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [proxyStats, setProxyStats] = useState<any>(null);
-  const [nextUpdateIn, setNextUpdateIn] = useState<number>(120);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number>(300);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [globalAutoUpdateEnabled, setGlobalAutoUpdateEnabled] = useState<boolean>(true);
   const [dataSource, setDataSource] = useState<'db' | 'bybit' | null>(null);
@@ -35,7 +35,7 @@ const Index = () => {
 
   const loadAllOffers = async (forceUpdate = false) => {
     setIsLoading(true);
-    setNextUpdateIn(120);
+    setNextUpdateIn(300);
     
     try {
       const forceSuffix = forceUpdate ? '&force=true' : '';
@@ -118,15 +118,15 @@ const Index = () => {
     
     // Обратный отсчёт каждую секунду
     const countdownId = setInterval(() => {
-      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 120);
+      setNextUpdateIn(prev => prev > 0 ? prev - 1 : 300);
     }, 1000);
     
-    // Автообновление каждые 120 секунд (если включено)
+    // Автообновление каждые 300 секунд (если включено)
     let updateIntervalId: NodeJS.Timeout | null = null;
     if (autoUpdateEnabled) {
       updateIntervalId = setInterval(() => {
         loadAllOffers();
-      }, 120 * 1000); // 120 секунд (2 минуты)
+      }, 300 * 1000); // 300 секунд (5 минут)
     }
     
     return () => {
